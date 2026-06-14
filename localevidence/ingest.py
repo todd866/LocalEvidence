@@ -22,12 +22,15 @@ from . import config
 
 
 def index_library(*, match: Optional[str] = None, source: Optional[str] = None,
-                  limit: int = 0, index=None, verbose: bool = True) -> dict:
+                  limit: int = 0, batch: int = 150, index=None,
+                  verbose: bool = True) -> dict:
     """Index the configured library's full-text papers into the passage index.
 
     match : only papers whose title matches this regex (for a topic subset).
     source: only papers with this catalog `source`.
     limit : index at most N papers.
+    batch : papers per persisted chunk — each batch is saved before the next, so a
+            large run is resumable and never loses work to an interruption.
     """
     from .library import connect
     from .acquire import AcquiredPaper
@@ -68,7 +71,14 @@ def index_library(*, match: Optional[str] = None, source: Optional[str] = None,
 
     idx = index if index is not None else PassageIndex()
     before = idx.stats()
-    added = idx.add_papers(papers, verbose=verbose)
+    step = batch if batch and batch > 0 else max(len(papers), 1)
+    n_batches = (len(papers) + step - 1) // step if papers else 0
+    added = 0
+    for bi, i in enumerate(range(0, len(papers), step), 1):
+        added += idx.add_papers(papers[i:i + step], verbose=False)  # persists each batch
+        if verbose and n_batches > 1:
+            print(f"  index-library: batch {bi}/{n_batches} -> +{added} cumulative "
+                  f"({idx.stats()['papers']} papers, {idx.stats()['passages']} passages)")
     after = idx.stats()
     if verbose:
         print(f"  index-library: +{added} passages "

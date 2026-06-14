@@ -79,6 +79,7 @@ def main(argv=None) -> int:
     il.add_argument("--match", default=None, help="Only papers whose title matches this regex (topic subset)")
     il.add_argument("--source", default=None, help="Only papers with this catalog source")
     il.add_argument("--limit", type=int, default=0, help="Index at most N papers")
+    il.add_argument("--batch", type=int, default=150, help="Papers per persisted chunk (resumable on a big run)")
     il.add_argument("--quiet", action="store_true")
 
     pk = sub.add_parser("pack", help="Distributable knowledge pack: shareable list + summaries + map (no corpus)")
@@ -172,7 +173,7 @@ def main(argv=None) -> int:
     if args.command == "index-library":
         from .ingest import index_library
         index_library(match=args.match, source=args.source, limit=args.limit,
-                      verbose=not args.quiet)
+                      batch=args.batch, verbose=not args.quiet)
         return 0
 
     if args.command == "pack":
