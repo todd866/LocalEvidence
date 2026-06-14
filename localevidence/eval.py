@@ -92,7 +92,7 @@ def run_eval(items: Sequence[Union[str, dict]], *,
     retrieval) or 'reasoning' (scaffolded, for management/judgment/epi). Optionally
     also the one-shot baseline and rubric-completeness scoring."""
     answer_fn = harness.reasoning_answer if mode == "reasoning" else harness.grounded_answer
-    h_results, b_results, rows = [], [], []
+    h_results, b_results, h_paired, rows = [], [], [], []
     for i, item in enumerate(items):
         q = item["question"] if isinstance(item, dict) else item
         rub = item.get("rubric") if isinstance(item, dict) else None
@@ -106,6 +106,7 @@ def run_eval(items: Sequence[Union[str, dict]], *,
             b = baseline_answer(q, h["passages"], model=model)
             row["baseline"] = b["grounding"]
             b_results.append(b)
+            h_paired.append(h)  # pair: lift compares the SAME items, not all-N vs M
         if rubric and rub:
             row["rubric"] = score_rubric(h["answer"], rub, model=model)
         rows.append(row)
@@ -114,7 +115,7 @@ def run_eval(items: Sequence[Union[str, dict]], *,
     out = {"rows": rows, "model": model or inference.DEFAULT_MODEL,
            "summary": summarize(h_results)}
     if baseline and b_results:
-        out["lift"] = lift(h_results, b_results)
+        out["lift"] = lift(h_paired, b_results)  # paired subset only — apples to apples
     rub_rows = [r["rubric"] for r in rows if r.get("rubric")]
     if rub_rows:
         n = len(rub_rows)

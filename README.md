@@ -132,11 +132,14 @@ python3 -m localevidence audit -e 24   # or --project <slug>, --json, --resolve
 ```
 
 Commands: `ask` (the engine), `answer` (write a synthesised answer into the
-ledger), `audit` (provenance + citation-provenance check), `synthesize` (grounded
-answer via a free local model), `index-library` (index a corpus you already
-hold), `pack` (export/harvest a shareable knowledge pack),
-`queue` (drain the phone queue), `load` (self-play a question bank), `guidelines`
-(harvest CPGs), `serve` (backend + PWA). `--help` on each.
+ledger), `verify` (retrieve evidence + citation-provenance for one claim, headless),
+`audit` (provenance + citation-provenance check), `synthesize` (grounded answer via
+a free local model; `--harness` for the multi-stage loop), `eval-local` (run the
+harness over many questions on-device and score grounding/reasoning — see
+[`evals/`](evals/)), `index-library` (index a corpus you already hold), `pack`
+(export/harvest a shareable knowledge pack), `queue` (drain the phone queue),
+`load` (self-play a question bank), `guidelines` (harvest CPGs), `serve` (backend +
+PWA). `--help` on each.
 
 ### Bulk-index a library you've built up
 

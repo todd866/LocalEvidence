@@ -200,9 +200,13 @@ def grounded_answer(question: str, *,
     pids = [p["id"] for p in passages]
 
     if not passages:
-        return {"answer": "No supporting passages were retrieved; cannot answer "
+        # Same key set as the normal return, so callers (eval.run_eval,
+        # synthesize --harness) never KeyError on an empty/off-topic corpus.
+        return {"question": question,
+                "answer": "No supporting passages were retrieved; cannot answer "
                           "from the local corpus.", "grounded": False,
-                "passages": [], "stages": stages, "model": model or inference.DEFAULT_MODEL}
+                "grounding": verify_citations("", []), "passages": [], "n_passages": 0,
+                "stages": stages, "model": model or inference.DEFAULT_MODEL}
 
     # 2. draft
     draft = draft_answer(question, passages, model=model)

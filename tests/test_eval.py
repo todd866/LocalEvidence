@@ -51,6 +51,16 @@ def test_run_eval_with_vignette_and_rubric(monkeypatch):
     assert out["rubric_summary"]["mean_rubric_coverage"] == 1.0
 
 
+def test_run_eval_empty_retrieval_does_not_crash(monkeypatch):
+    # regression for the no-passages KeyError blocker: run_eval over a corpus that
+    # retrieves nothing must produce a row, not raise.
+    from localevidence import inference
+    monkeypatch.setattr(inference, "generate", lambda *a, **k: "unused")
+    out = ev.run_eval(["Q?"], retrieve=lambda q, kk: [], model="ollama:x")
+    assert out["summary"]["n"] == 1
+    assert out["rows"][0]["harness"]["coverage"] == 0.0
+
+
 def test_run_eval_with_mock(monkeypatch):
     from localevidence import harness, inference
     monkeypatch.setattr(inference, "generate",

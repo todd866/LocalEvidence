@@ -91,3 +91,8 @@ def test_grounded_answer_no_passages_is_honest(monkeypatch):
     monkeypatch.setattr(inference, "generate", lambda *a, **k: "should not be called")
     out = harness.grounded_answer("Q?", retrieve=lambda q, k: [], model="ollama:x")
     assert out["grounded"] is False and out["passages"] == []
+    # regression: the no-passages branch MUST carry the same keys as the normal
+    # return, or callers (run_eval, synthesize --harness) KeyError on an empty corpus.
+    for key in ("question", "grounding", "n_passages", "stages", "model"):
+        assert key in out, f"no-passages return missing {key!r}"
+    assert out["grounding"]["coverage"] == 0.0 and out["n_passages"] == 0
