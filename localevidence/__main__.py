@@ -92,6 +92,11 @@ def main(argv=None) -> int:
     vf.add_argument("--acquire", action="store_true", help="Acquire-on-miss when coverage is thin")
     vf.add_argument("--importance", type=int, default=3, help="1-3; acquire only fires at >=2")
 
+    sy = sub.add_parser("synthesize", help="Answer a question grounded in the corpus using a FREE local open-weight model (on-device, no paid API)")
+    sy.add_argument("question", nargs="+", help="The clinical question")
+    sy.add_argument("--model", default=None, help="Model spec e.g. ollama:qwen2.5:14b (or set LOCALEVIDENCE_MODEL)")
+    sy.add_argument("-k", "--passages", type=int, default=8, help="Passages to ground in")
+
     pk = sub.add_parser("pack", help="Distributable knowledge pack: shareable list + summaries + map (no corpus)")
     pk.add_argument("action", choices=["export", "harvest"], help="export a pack / harvest (rebuild) from one")
     pk.add_argument("dir", help="Pack directory (write for export, read for harvest)")
@@ -201,6 +206,22 @@ def main(argv=None) -> int:
                               acquire_on_miss=args.acquire, importance=args.importance,
                               acquirer=acquirer)
         print(json.dumps(out, indent=2))
+        return 0
+
+    if args.command == "synthesize":
+        from .index import PassageIndex
+        from .verify import _passage_view
+        from .inference import synthesize_answer, InferenceError
+        q = " ".join(args.question)
+        passages = [_passage_view(p) for p in PassageIndex().search(q, k=args.passages)]
+        try:
+            out = synthesize_answer(q, passages, model=args.model)
+        except InferenceError as e:
+            print(f"local synthesis unavailable: {e}", file=sys.stderr)
+            return 1
+        print(out["answer"])
+        print(f"\n— {out['model']} · grounded in {out['n_passages']} corpus passages",
+              file=sys.stderr)
         return 0
 
     if args.command == "pack":

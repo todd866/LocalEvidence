@@ -79,6 +79,29 @@ call. Reconstructing the optional acquisition tier, adding a new guideline
 crawler, wiring a citation graph: these are exactly the tasks you hand to Claude
 Code inside this repo. The repository is the kernel; the agent does the rest.
 
+## Run it fully local (free, on-device)
+
+The synthesis step doesn't have to be Claude-in-the-loop — it can be a **free,
+local open-weight model**. Point `synthesize` at an [Ollama](https://ollama.com)
+server and a 14B model on a laptop returns a grounded, cited answer with no paid
+API and nothing leaving the machine:
+
+```bash
+ollama pull qwen2.5:14b
+LOCALEVIDENCE_PASSAGES=/path/to/corpus \
+  python3 -m localevidence synthesize \
+    "Empiric antibiotic for a child with bacterial meningitis?" \
+    --model ollama:qwen2.5:14b          # or set LOCALEVIDENCE_MODEL
+```
+
+This is deliberate: the safety lives in the **corpus and grounding**, not the
+model. The prompt constrains the model to answer *only* from the retrieved
+passages and cite them — so a small local model declines to guess when the
+evidence is thin rather than confabulating. The whole stack — open corpus + open
+model + local inference — then runs on-prem, private, and inspectable, which is
+the strongest substrate for treating the *deployment*, not the model's
+capability, as the safety variable.
+
 ## Quickstart
 
 ```bash
@@ -109,8 +132,9 @@ python3 -m localevidence audit -e 24   # or --project <slug>, --json, --resolve
 ```
 
 Commands: `ask` (the engine), `answer` (write a synthesised answer into the
-ledger), `audit` (provenance + citation-provenance check), `index-library` (index
-a corpus you already hold), `pack` (export/harvest a shareable knowledge pack),
+ledger), `audit` (provenance + citation-provenance check), `synthesize` (grounded
+answer via a free local model), `index-library` (index a corpus you already
+hold), `pack` (export/harvest a shareable knowledge pack),
 `queue` (drain the phone queue), `load` (self-play a question bank), `guidelines`
 (harvest CPGs), `serve` (backend + PWA). `--help` on each.
 
