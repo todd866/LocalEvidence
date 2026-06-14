@@ -24,6 +24,13 @@ LIBRARY_ROOT = Path(
     os.environ.get("LOCALEVIDENCE_LIBRARY", ROOT / "data" / "library")
 )
 
+# The passage index (retrieval layer). Default lives in the repo; override with
+# LOCALEVIDENCE_PASSAGES to serve/verify against a corpus you keep elsewhere (e.g.
+# a private full-stack instance) without copying code into it.
+PASSAGES_DIR = Path(
+    os.environ.get("LOCALEVIDENCE_PASSAGES", ROOT / "data" / "passages")
+)
+
 # Polite-pool contact for OpenAlex / Unpaywall / Europe PMC. These free APIs
 # rate-limit anonymous traffic and prioritise requests that carry a real email.
 # Set your OWN: Unpaywall rejects this placeholder outright (HTTP 422) and the

@@ -94,7 +94,7 @@ class PassageIndex:
     """Persistent, incremental, slug-keyed hybrid passage store."""
 
     def __init__(self, store_dir: Optional[Path] = None):
-        self.store_dir = Path(store_dir or (config.ROOT / "data" / "passages"))
+        self.store_dir = Path(store_dir or config.PASSAGES_DIR)
         self.store_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.store_dir / "passages.db"
         self.vec_path = self.store_dir / "passages.npy"
