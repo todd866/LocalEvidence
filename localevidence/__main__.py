@@ -69,6 +69,12 @@ def main(argv=None) -> int:
     qu.add_argument("--keep", action="store_true", help="Don't clear the queue after run")
     qu.add_argument("--quiet", action="store_true", help="Less progress output")
 
+    au = sub.add_parser("audit", help="Emit the provenance + grounding audit trail for a worked answer")
+    au.add_argument("-e", "--entry", type=int, default=None, help="Ledger entry id (default: most recent answered)")
+    au.add_argument("--project", default=None, help="Audit the latest answered run of a project")
+    au.add_argument("--json", action="store_true", help="Machine-readable JSON")
+    au.add_argument("--resolve", action="store_true", help="Live-check cited DOIs against doi.org (network)")
+
     args = parser.parse_args(argv)
 
     if args.command == "ask":
@@ -141,6 +147,11 @@ def main(argv=None) -> int:
                       oa_only=args.oa_only, clear=not args.keep,
                       verbose=not args.quiet)
         return 0
+
+    if args.command == "audit":
+        from .audit import audit_cli
+        return audit_cli(entry_id=args.entry, project=args.project,
+                         as_json=args.json, resolve=args.resolve)
     return 2
 
 

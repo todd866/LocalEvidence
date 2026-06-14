@@ -103,11 +103,27 @@ python3 -m localevidence guidelines --source rch
 
 # Serve the phone face (installable offline PWA) over your LAN / tailnet:
 python3 -m localevidence serve         # http://127.0.0.1:8765
+
+# Audit a worked answer: emit its full provenance trail + grounding check:
+python3 -m localevidence audit -e 24   # or --project <slug>, --json, --resolve
 ```
 
 Commands: `ask` (the engine), `answer` (write a synthesised answer into the
-ledger), `load` (self-play a question bank), `guidelines` (harvest CPGs),
+ledger), `audit` (provenance + grounding trail), `queue` (drain the phone
+queue), `load` (self-play a question bank), `guidelines` (harvest CPGs),
 `serve` (backend + PWA). `--help` on each.
+
+## Audit: every answer ships its trail
+
+Auditability is the whole point — and a safety property. `localevidence audit`
+reconstructs how an answer was produced: the discovery → triage → acquisition →
+retrieval chain, the **citation grounding check** (are the answer's cited DOIs
+actually in what the session retrieved, or smuggled in from the model's memory? —
+the exact failure mode it flags), which retrieved sources were used vs available,
+the logged gaps, and a **verification ceiling** (how far back an independent party
+can reconstruct it — up to "end-to-end re-runnable"). A closed product can show you
+its answer and a reference list; an open one can show you the whole chain, and let
+you re-run it. That difference is the case for open clinical-evidence tooling.
 
 ## Requirements
 

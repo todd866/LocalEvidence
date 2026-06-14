@@ -153,6 +153,20 @@ ledger + model once and stays warm, plus an installable offline PWA
 never the open internet**. Worked answers cache offline; a novel question returns
 live evidence and queues for the next home deep-run.
 
+### 9. Audit — ✅
+
+`localevidence audit` (module `audit.py`) reconstructs how an answer was produced
+and makes it independently re-checkable — auditability as a safety property, and
+the concrete case for open clinical tooling. For a ledger entry it assembles the
+discovery → triage → acquisition → retrieval chain from the run checkpoints, runs
+the **citation grounding check** (are the answer's cited DOIs actually in what the
+session retrieved? an ungrounded citation — smuggled in from parametric memory or
+fabricated — is flagged; `--resolve` adds a live doi.org existence check), marks
+which retrieved sources were used vs available, and reports a **verification
+ceiling** (rung 0–9: how far back a third party can reconstruct it, up to
+"end-to-end re-runnable"). The tool reports its own ceiling honestly — a
+ledger-only answer tops out lower than one with full run checkpoints.
+
 ## Condensed cluster objects (CKO) — the condensation layer ⬜
 
 The "coded compressed thing" so we don't re-read whole papers, built over the
@@ -242,7 +256,8 @@ acquisition method — ever enters git history.
 5. ✅ simulated-question loader + seed bank.
 6. ✅ guideline harvester (RCH worked example).
 7. ✅ serve + offline PWA.
-8. ⬜ citation + claim graphs (the graph maps — designed, not built).
-9. ⬜ CKO condensation layer (cluster → distil → contradiction set).
-10. ⬜ MedCPT reranker + faithfulness gate.
-11. ⬜ single-writer lock for safe concurrent `ask`/`load`/`serve`.
+8. ✅ audit layer (provenance trail + citation grounding check + verification ceiling).
+9. ⬜ citation + claim graphs (the graph maps — designed, not built).
+10. ⬜ CKO condensation layer (cluster → distil → contradiction set).
+11. ⬜ MedCPT reranker + faithfulness gate.
+12. ⬜ single-writer lock for safe concurrent `ask`/`load`/`serve`.
