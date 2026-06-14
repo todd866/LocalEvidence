@@ -1,0 +1,18 @@
+# Clinical grounding eval — questions for `localevidence eval-local`.
+# Paeds + neuromuscular weighted (matches a paeds/neuro-heavy corpus). Lines
+# starting with # are ignored. Answers are scored on grounding, not a reference key.
+In a child with bacterial meningitis, what empiric antibiotic and dose are recommended, and why does timing matter?
+What is the first-line benzodiazepine and dose for paediatric convulsive status epilepticus?
+What adrenaline dose and route are recommended for anaphylaxis in a 20 kg child?
+How should fluid hydration be managed in an infant with moderate-to-severe bronchiolitis?
+What clinical and electrophysiological features distinguish multifocal motor neuropathy from amyotrophic lateral sclerosis?
+Does riluzole improve survival in amyotrophic lateral sclerosis, and by how much?
+What is the role of non-invasive ventilation in the respiratory management of ALS?
+What are the diagnostic criteria for Kawasaki disease and its recommended first-line treatment?
+How is diabetic ketoacidosis fluid resuscitation managed in children?
+What is the empiric management of a febrile neutropenic child receiving chemotherapy?
+What clinical signs raise concern for non-accidental injury in an infant presenting with fractures?
+What are the red flags warranting medical admission in adolescent anorexia nervosa?
+What is the recommended emergency management of acute severe asthma in a child?
+How does the evidence for edaravone in ALS compare with riluzole?
+What investigations confirm a diagnosis of cystic fibrosis in a neonate?
