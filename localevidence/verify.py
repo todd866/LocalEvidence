@@ -16,8 +16,11 @@ _NEG = (" no ", " not ", " without ", " absence of ", " contraindicat",
 
 
 def build_query(claim: dict) -> str:
+    topics = claim.get("topics") or []
+    if isinstance(topics, str):           # a bare string is one topic, not chars
+        topics = [topics]
     parts = [claim.get("text", ""), claim.get("context", "") or ""]
-    parts += list(claim.get("topics") or [])
+    parts += [str(t) for t in topics]
     return " ".join(p for p in parts if p).strip()
 
 
@@ -37,17 +40,21 @@ def corpus_version(index) -> str:
     return f"le-{s['papers']}-{s['passages']}"
 
 
-def _stance_hint(text: str) -> str:
-    """Cheap lexical signal ONLY — not an entailment verdict (v3 = cross-encoder)."""
+def _negation_hint(text: str) -> str:
+    """Whether the passage contains negation language. A crude LEXICAL flag, NOT a
+    claim-aware stance/entailment verdict — a passage saying 'no significant
+    difference' may well SUPPORT a 'no difference' claim. Named 'negation' (not
+    'stance') so callers don't overread it as contradiction. Real entailment is a
+    cross-encoder, later."""
     t = f" {text.lower()} "
-    return "contradicting" if any(n in t for n in _NEG) else "neutral"
+    return "has_negation" if any(n in t for n in _NEG) else "none"
 
 
 def _passage_view(p, max_chars: int = 600) -> dict:
     return {"id": f"{p.slug}#{p.chunk_idx}", "paper": p.title, "doi": p.doi,
             "year": p.year, "tier": p.tier,
             "text": " ".join(p.text.split())[:max_chars],
-            "score": round(p.score, 5), "stance_hint": _stance_hint(p.text)}
+            "score": round(p.score, 5), "negation_hint": _negation_hint(p.text)}
 
 
 def citation_check(citation: dict, passages, index) -> dict:

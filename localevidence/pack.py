@@ -38,7 +38,11 @@ _STOP = {"the", "and", "for", "with", "from", "study", "review", "analysis",
          "patients", "clinical", "using", "based", "effect", "effects", "among",
          "associated", "outcomes", "management", "treatment", "trial"}
 
-_BIBLIO = ("slug", "doi", "pmid", "title", "authors", "year", "journal", "tier", "source")
+# Bibliographic fields ONLY. Deliberately excludes `source`: how a paper was
+# acquired (OA vs a shadow/ezproxy tier) is private provenance and must never ship
+# in a public pack — it would leak the acquisition method the public repo says it
+# doesn't include.
+_BIBLIO = ("slug", "doi", "pmid", "title", "authors", "year", "journal", "tier")
 
 
 def _paper_centroids(index) -> tuple[list[str], np.ndarray, dict]:

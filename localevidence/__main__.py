@@ -235,7 +235,7 @@ def main(argv=None) -> int:
                 print(out["answer"])
                 g = out["grounding"]
                 tail = (f"\n— {out['model']} · stages: {'->'.join(out['stages'])} · "
-                        f"{out['n_passages']} passages · grounding {int(g['coverage']*100)}%"
+                        f"{out['n_passages']} passages · citation-coverage {int(g['coverage']*100)}%"
                         f" · {g['hallucinated_citations']} hallucinated cite(s)")
                 print(tail, file=sys.stderr)
                 if args.show_grounding:
@@ -275,7 +275,7 @@ def main(argv=None) -> int:
         def progress(i, row):
             g = row["harness"]; rub = row.get("rubric")
             rtxt = f" · rubric {int(rub['rubric_coverage']*100)}%" if rub else ""
-            print(f"  [{i+1}/{len(items)}] grounding {int(g['coverage']*100)}% "
+            print(f"  [{i+1}/{len(items)}] citation-coverage {int(g['coverage']*100)}% "
                   f"({g['hallucinated_citations']} halluc){rtxt} — {row['question'][:55]}",
                   file=sys.stderr)
         try:

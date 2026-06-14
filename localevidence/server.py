@@ -66,13 +66,15 @@ def _make_acquirer(max_pulls: int = 4, oa_only: bool = True):
         key = topic.lower().strip()
         if key in _ACQUIRED_TOPICS:
             return {"pulled": 0, "topic": topic, "note": "topic already acquired this run"}
-        _ACQUIRED_TOPICS.add(key)
         before = _INDEX.stats().get("papers", 0)
         try:
             from .pipeline import ask as _ask
             _ask(topic, top_n=max_pulls, oa_only=oa_only, verbose=False)
         except Exception as e:  # acquisition is best-effort; never break the verify
+            # NOT marked acquired: a failed pull (transient network/error) can retry
+            # on a later request instead of being suppressed for the server's lifetime.
             return {"pulled": 0, "topic": topic, "error": str(e)}
+        _ACQUIRED_TOPICS.add(key)  # only after a successful pull
         _INDEX.reload()
         return {"pulled": max(0, _INDEX.stats().get("papers", 0) - before), "topic": topic}
     return _acquire
@@ -82,15 +84,22 @@ def handle_verify(body: dict) -> dict:
     """Pure-ish entry for POST /api/verify-evidence (also unit-tested directly)."""
     from . import verify
     claim = body.get("claim") or {}
-    if not (claim.get("text") or "").strip():
+    if not isinstance(claim, dict) or not (str(claim.get("text") or "")).strip():
         return {"error": "empty claim.text"}
     opts = body.get("options") or {}
+    if not isinstance(opts, dict):
+        return {"error": "options must be an object"}
+    # Validate + clamp numeric options so malformed JSON yields a 400, not a 500.
+    try:
+        k = max(1, min(50, int(opts.get("k", 8))))
+        min_conf = max(0.0, min(1.0, float(opts.get("min_confidence", 0.45))))
+        importance = max(1, min(3, int(opts.get("importance", 1))))
+    except (TypeError, ValueError):
+        return {"error": "k/min_confidence/importance must be numeric"}
     return verify.verify_evidence(
         claim, index=_INDEX, citation=body.get("citation"),
-        k=int(opts.get("k", 8)),
-        acquire_on_miss=bool(opts.get("acquire_on_miss", False)),
-        min_confidence=float(opts.get("min_confidence", 0.45)),
-        importance=int(opts.get("importance", 1)),
+        k=k, acquire_on_miss=bool(opts.get("acquire_on_miss", False)),
+        min_confidence=min_conf, importance=importance,
         acquirer=_make_acquirer(oa_only=not opts.get("allow_shadow", False))
         if opts.get("acquire_on_miss") else None)
 

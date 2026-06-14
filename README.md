@@ -192,6 +192,12 @@ Python 3.10+, and the packages in [`requirements.txt`](requirements.txt)
 for robust PDF text). `pdftotext` (poppler) is used if present. SQLite FTS5 ships
 with CPython. First run downloads the MiniLM model (~90 MB) once.
 
+**Clone-and-run, not a wheel.** State (corpus, passage index, ledger, projects)
+lives under the repo by default, so run from a clone (`pip install -e .` just adds
+the `localevidence` command). To keep state elsewhere, point the env vars at it:
+`LOCALEVIDENCE_PASSAGES` (passage index), `LOCALEVIDENCE_LIBRARY` (paper store),
+`LOCALEVIDENCE_MODEL` (local model), `LOCALEVIDENCE_EMAIL` (OA contact).
+
 ## Dogfooding: run this repo, improve this repo
 
 The repo is meant to be the author's daily driver. The code is tracked; the

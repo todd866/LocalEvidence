@@ -32,7 +32,9 @@ def test_export_pack_structure_and_shareable_boundary(tmp_path):
     assert len(papers) == 6
     keys = set().union(*[set(p) for p in papers])
     assert "text_path" not in keys and "pdf_path" not in keys
-    assert keys <= {"slug", "doi", "pmid", "title", "authors", "year", "journal", "tier", "source"}
+    # acquisition provenance must NOT ship publicly (would leak the shadow/ezproxy tier)
+    assert "source" not in keys
+    assert keys <= {"slug", "doi", "pmid", "title", "authors", "year", "journal", "tier"}
 
     # map: clusters cover every paper; links exist; NO verbatim passage text leaks
     m = json.loads((out / "map.json").read_text())
