@@ -82,6 +82,7 @@ class Passage:
     tier: str = ""
     chunk_idx: int = 0
     score: float = 0.0
+    cosine: float = 0.0          # dense query·passage cosine (discriminative coverage signal)
     dense_rank: Optional[int] = None
     sparse_rank: Optional[int] = None
     guaranteed: bool = False
@@ -238,7 +239,7 @@ class PassageIndex:
             return []
 
     def _passage(self, pid: int, sc: float, dense_rank, sparse_rank,
-                 guaranteed: bool = False) -> Optional[Passage]:
+                 guaranteed: bool = False, cosine: float = 0.0) -> Optional[Passage]:
         row = self._con.execute(
             "SELECT slug,title,doi,pmid,year,journal,tier,chunk_idx,text "
             "FROM passages WHERE passage_id=?", (pid,)).fetchone()
@@ -247,7 +248,7 @@ class PassageIndex:
         slug, title, doi, pmid, year, journal, tier, chunk_idx, text = row
         return Passage(passage_id=pid, slug=slug, text=text, title=title, doi=doi,
                        pmid=pmid, year=year, journal=journal, tier=tier,
-                       chunk_idx=chunk_idx, score=sc, dense_rank=dense_rank,
+                       chunk_idx=chunk_idx, score=sc, cosine=cosine, dense_rank=dense_rank,
                        sparse_rank=sparse_rank, guaranteed=guaranteed)
 
     def search(self, query: str, *, k: int = 12, k_dense: int = 50,
@@ -278,7 +279,8 @@ class PassageIndex:
             return []
 
         top = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:k]
-        out = [p for p in (self._passage(pid, sc, dense_rank.get(pid), sparse_rank.get(pid))
+        out = [p for p in (self._passage(pid, sc, dense_rank.get(pid), sparse_rank.get(pid),
+                                         cosine=float(sims[pid]))
                            for pid, sc in top) if p]
 
         # Tier guarantee: each of THIS question's OWN guideline/SR papers
@@ -302,7 +304,8 @@ class PassageIndex:
                 if pids:
                     best = max(pids, key=lambda i: sims[i])
                     p = self._passage(best, float(sims[best]), dense_rank.get(best),
-                                      sparse_rank.get(best), guaranteed=True)
+                                      sparse_rank.get(best), guaranteed=True,
+                                      cosine=float(sims[best]))
                     if p:
                         out.append(p)
 
@@ -324,7 +327,8 @@ class PassageIndex:
                                          key=lambda kv: kv[1][0], reverse=True)[:max_guidelines]:
                 if s < guideline_floor:
                     break
-                p = self._passage(pid, s, dense_rank.get(pid), sparse_rank.get(pid), guaranteed=True)
+                p = self._passage(pid, s, dense_rank.get(pid), sparse_rank.get(pid),
+                                  guaranteed=True, cosine=float(s))
                 if p:
                     out.append(p)
         return out

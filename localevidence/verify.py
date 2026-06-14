@@ -21,14 +21,15 @@ def build_query(claim: dict) -> str:
     return " ".join(p for p in parts if p).strip()
 
 
-def confidence(passages, rrf_k: int = 60) -> float:
-    """Top fused RRF score normalised to 0–1 (rank-0-in-both ≈ 2/rrf_k -> 1.0).
-
-    A retrieval-strength signal, NOT a calibrated probability."""
+def confidence(passages) -> float:
+    """Coverage signal: the top passage's dense query·passage cosine, clamped to
+    0–1. Discriminative (≈0.5–0.7 on-topic, ≈0.2 off-topic) — unlike the fused RRF
+    rank score, which saturates at 1.0 for any double-ranked hit and so can't gate
+    acquire-on-miss. A retrieval-strength signal, NOT a calibrated probability."""
     if not passages:
         return 0.0
-    top = max(p.score for p in passages)
-    return round(max(0.0, min(1.0, top / (2.0 / rrf_k))), 3)
+    top = max(p.cosine for p in passages)
+    return round(max(0.0, min(1.0, top)), 3)
 
 
 def corpus_version(index) -> str:
