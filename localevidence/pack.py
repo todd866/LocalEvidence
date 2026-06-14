@@ -95,9 +95,14 @@ def _cluster_label(slugs: list[str], meta: dict, n: int = 4) -> str:
     return " · ".join(t for t, _ in top) or "(unlabelled)"
 
 
-def export_pack(out_dir: str | Path, *, index=None, k_clusters: Optional[int] = None,
-                neighbours: int = 5, verbose: bool = True) -> dict:
-    """Write a shareable knowledge pack: papers.jsonl + map.json + summaries.jsonl."""
+def export_pack(out_dir: str | Path, *, index=None, match: Optional[str] = None,
+                k_clusters: Optional[int] = None, neighbours: int = 5,
+                verbose: bool = True) -> dict:
+    """Write a shareable knowledge pack: papers.jsonl + map.json + summaries.jsonl.
+
+    `match`: restrict the pack to papers whose title matches this regex (a topic
+    subset, e.g. an MND pack from a mixed corpus).
+    """
     from .index import PassageIndex
     from .library import connect
     out = Path(out_dir)
@@ -106,6 +111,12 @@ def export_pack(out_dir: str | Path, *, index=None, k_clusters: Optional[int] = 
     # --- 1. paper list (bibliographic only) — from the catalog, indexed papers --
     idx = index if index is not None else PassageIndex()
     slugs, X, meta = _paper_centroids(idx)
+    if match:
+        rx = re.compile(match, re.I)
+        keep = [i for i, s in enumerate(slugs)
+                if rx.search(meta.get(s, {}).get("title") or "")]
+        slugs = [slugs[i] for i in keep]
+        X = X[keep] if keep else X[:0]
     con = connect()
     rows = {r["slug"]: dict(r) for r in
             (dict(zip([d[0] for d in con.execute("SELECT * FROM papers LIMIT 0").description], row))

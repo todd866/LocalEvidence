@@ -84,6 +84,7 @@ def main(argv=None) -> int:
     pk = sub.add_parser("pack", help="Distributable knowledge pack: shareable list + summaries + map (no corpus)")
     pk.add_argument("action", choices=["export", "harvest"], help="export a pack / harvest (rebuild) from one")
     pk.add_argument("dir", help="Pack directory (write for export, read for harvest)")
+    pk.add_argument("--match", default=None, help="Export only papers whose title matches this regex (topic subset)")
     pk.add_argument("--clusters", type=int, default=None, help="Number of topic clusters (export; default ~sqrt(n))")
     pk.add_argument("--neighbours", type=int, default=5, help="Nearest-neighbour links per paper (export)")
     pk.add_argument("--oa-only", action="store_true", help="Open-access providers only (harvest)")
@@ -177,7 +178,7 @@ def main(argv=None) -> int:
     if args.command == "pack":
         from .pack import export_pack, harvest_pack
         if args.action == "export":
-            export_pack(args.dir, k_clusters=args.clusters,
+            export_pack(args.dir, match=args.match, k_clusters=args.clusters,
                         neighbours=args.neighbours, verbose=not args.quiet)
         else:
             harvest_pack(args.dir, oa_only=args.oa_only, top=args.top,
