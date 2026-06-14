@@ -159,10 +159,12 @@ live evidence and queues for the next home deep-run.
 and makes it independently re-checkable — auditability as a safety property, and
 the concrete case for open clinical tooling. For a ledger entry it assembles the
 discovery → triage → acquisition → retrieval chain from the run checkpoints, runs
-the **citation grounding check** (are the answer's cited DOIs actually in what the
-session retrieved? an ungrounded citation — smuggled in from parametric memory or
-fabricated — is flagged; `--resolve` adds a live doi.org existence check), marks
-which retrieved sources were used vs available, and reports a **verification
+the **citation provenance check** (were the answer's cited sources — by DOI or by
+name matched to a retrieved title — actually retrieved this session? a citation
+not in the retrieval set is flagged as possibly introduced from memory; `--resolve`
+adds a live doi.org existence check. It verifies retrieval *presence*, not whether
+the source supports the specific claim — that is the manual claim-support step),
+marks which retrieved sources were used vs available, and reports a **verification
 ceiling** (rung 0–9: how far back a third party can reconstruct it, up to
 "end-to-end re-runnable"). The tool reports its own ceiling honestly — a
 ledger-only answer tops out lower than one with full run checkpoints.

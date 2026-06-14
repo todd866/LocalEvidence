@@ -100,7 +100,8 @@ def record_answer(
             raise SystemExit(f"no answer text: write it to {af} or pass --file")
         answer = af.read_text()
 
-    cited = sorted(set(re.findall(r"10\.\d{4,9}/[^\s\])\"'>]+", answer)))
+    from .audit import _answer_dois   # shared DOI extraction (handles embedded parens)
+    cited = sorted(set(_answer_dois(answer)))
     led = Ledger()
     led.update(entry_id, answer=answer, reasoning=reasoning,
                grounding={"cited_sources": cited, "n_cited": len(cited)},

@@ -117,13 +117,16 @@ queue), `load` (self-play a question bank), `guidelines` (harvest CPGs),
 
 Auditability is the whole point — and a safety property. `localevidence audit`
 reconstructs how an answer was produced: the discovery → triage → acquisition →
-retrieval chain, the **citation grounding check** (are the answer's cited DOIs
-actually in what the session retrieved, or smuggled in from the model's memory? —
-the exact failure mode it flags), which retrieved sources were used vs available,
-the logged gaps, and a **verification ceiling** (how far back an independent party
-can reconstruct it — up to "end-to-end re-runnable"). A closed product can show you
-its answer and a reference list; an open one can show you the whole chain, and let
-you re-run it. That difference is the case for open clinical-evidence tooling.
+retrieval chain, the **citation provenance check** (were the answer's cited
+sources — by DOI, or by name matched to a retrieved paper's title — actually
+retrieved this session, or introduced from the model's memory? a citation that
+isn't in the retrieval set is flagged; note this verifies retrieval *presence*,
+not whether the source supports the specific claim — that is the manual step),
+which retrieved sources were used vs available, the logged gaps, and a
+**verification ceiling** (how far back an independent party can reconstruct it —
+up to "end-to-end re-runnable"). A closed product can show you its answer and a
+reference list; an open one can show you the whole chain, and let you re-run it.
+That difference is the case for open clinical-evidence tooling.
 
 ## Requirements
 
