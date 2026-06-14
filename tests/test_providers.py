@@ -9,6 +9,13 @@ from localevidence.library.providers import (
 
 PDF = b"%PDF-1.4 minimal body"
 
+# An operator may drop a git-ignored providers/private.py (the full-stack plug-in).
+# When present, the "defaults to stub" behaviour is intentionally overridden, so
+# the stub-default tests skip. In a clean checkout / CI there is no private.py.
+from pathlib import Path as _Path
+_HAS_PRIVATE = (_Path(P.__file__).parent / "private.py").exists()
+_skip_if_plugin = pytest.mark.skipif(_HAS_PRIVATE, reason="operator private.py plug-in present")
+
 
 class FakeProvider:
     """A test provider returning a preset value / raising a preset error."""
@@ -35,11 +42,13 @@ def test_shadow_stub_raises_not_implemented():
         ShadowProvider().fetch("10.1/x", title="t")
 
 
+@_skip_if_plugin
 def test_load_shadow_defaults_to_stub(monkeypatch):
     monkeypatch.delenv("LOCALEVIDENCE_SHADOW", raising=False)
     assert isinstance(load_shadow_provider(), ShadowProvider)
 
 
+@_skip_if_plugin
 def test_load_shadow_bogus_env_falls_back_to_stub(monkeypatch):
     monkeypatch.setenv("LOCALEVIDENCE_SHADOW", "no_such_pkg_zzz:Bogus")
     assert isinstance(load_shadow_provider(), ShadowProvider)

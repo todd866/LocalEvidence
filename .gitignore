@@ -4,6 +4,10 @@
 # Your acquisition provider plug-in — never committed.
 localevidence/library/providers/private.py
 
+# The full-stack section: wires the operator's real paperscope acquisition +
+# PaperLibrary corpus into the public repo. Private; NEVER committed.
+localevidence/paperscope/
+
 # The corpus and the persistent indices it builds.
 data/library/
 data/passages/

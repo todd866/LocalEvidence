@@ -114,21 +114,23 @@ a corpus you already hold), `pack` (export/harvest a shareable knowledge pack),
 `queue` (drain the phone queue), `load` (self-play a question bank), `guidelines`
 (harvest CPGs), `serve` (backend + PWA). `--help` on each.
 
-### Already have a library? Sit LocalEvidence on top of it
+### Bulk-index a library you've built up
 
-LocalEvidence doesn't have to start empty. Its `library` is pluggable — point
-`LOCALEVIDENCE_LIBRARY` at any paper store whose catalog has the expected schema
-(a personal store, a shared one, a harvested pack), then:
+`ask` indexes papers as it pulls them. But if you've accumulated full-text papers
+another way — dropped a batch of PDFs into the library's `inbox/`, harvested a
+pack, or grown the library over many sessions — `index-library` chunks + embeds
+them all into retrieval in one pass (incremental; already-indexed papers skipped):
 
 ```bash
-python3 -m localevidence index-library              # index every full-text paper into retrieval
-python3 -m localevidence index-library --match "amyotrophic|motor neuron"   # or a topic subset
+python3 -m localevidence index-library
+python3 -m localevidence index-library --match "amyotrophic|motor neuron"   # a topic subset
 ```
 
-It chunks + embeds the library's papers into the passage index, so retrieval
-covers the **whole corpus you already have**, not just what `ask` fetched. The
-library is the durable store; the passage index is the retrieval layer over it.
-Incremental — already-indexed papers are skipped.
+The library is the durable store; the passage index is the retrieval layer over
+it. *Power-user note:* the `library` backend is pluggable via `LOCALEVIDENCE_LIBRARY`,
+so if you keep a separate paper store with a compatible catalog, LocalEvidence can
+sit on top of it instead of duplicating it — which is how it pairs with a fuller
+acquisition/storage stack.
 
 ## Pack: distribute the map, not the corpus
 
