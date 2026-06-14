@@ -259,6 +259,7 @@ acquisition method — ever enters git history.
 6. ✅ guideline harvester (RCH worked example).
 7. ✅ serve + offline PWA.
 8. ✅ audit layer (provenance trail + citation grounding check + verification ceiling).
+8b. ✅ knowledge packs (`pack export`/`harvest`): the shareable list + summaries + map of a corpus, minus the copyrighted PDFs — corpus distributable as a public good (see `docs/PACK.md`).
 9. ⬜ citation + claim graphs (the graph maps — designed, not built).
 10. ⬜ CKO condensation layer (cluster → distil → contradiction set).
 11. ⬜ MedCPT reranker + faithfulness gate.

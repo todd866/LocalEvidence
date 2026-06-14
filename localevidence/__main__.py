@@ -75,6 +75,15 @@ def main(argv=None) -> int:
     au.add_argument("--json", action="store_true", help="Machine-readable JSON")
     au.add_argument("--resolve", action="store_true", help="Live-check cited DOIs against doi.org (network)")
 
+    pk = sub.add_parser("pack", help="Distributable knowledge pack: shareable list + summaries + map (no corpus)")
+    pk.add_argument("action", choices=["export", "harvest"], help="export a pack / harvest (rebuild) from one")
+    pk.add_argument("dir", help="Pack directory (write for export, read for harvest)")
+    pk.add_argument("--clusters", type=int, default=None, help="Number of topic clusters (export; default ~sqrt(n))")
+    pk.add_argument("--neighbours", type=int, default=5, help="Nearest-neighbour links per paper (export)")
+    pk.add_argument("--oa-only", action="store_true", help="Open-access providers only (harvest)")
+    pk.add_argument("--top", type=int, default=0, help="Harvest only the first N papers (harvest)")
+    pk.add_argument("--quiet", action="store_true")
+
     args = parser.parse_args(argv)
 
     if args.command == "ask":
@@ -152,6 +161,16 @@ def main(argv=None) -> int:
         from .audit import audit_cli
         return audit_cli(entry_id=args.entry, project=args.project,
                          as_json=args.json, resolve=args.resolve)
+
+    if args.command == "pack":
+        from .pack import export_pack, harvest_pack
+        if args.action == "export":
+            export_pack(args.dir, k_clusters=args.clusters,
+                        neighbours=args.neighbours, verbose=not args.quiet)
+        else:
+            harvest_pack(args.dir, oa_only=args.oa_only, top=args.top,
+                         verbose=not args.quiet)
+        return 0
     return 2
 
 

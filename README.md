@@ -109,9 +109,21 @@ python3 -m localevidence audit -e 24   # or --project <slug>, --json, --resolve
 ```
 
 Commands: `ask` (the engine), `answer` (write a synthesised answer into the
-ledger), `audit` (provenance + grounding trail), `queue` (drain the phone
-queue), `load` (self-play a question bank), `guidelines` (harvest CPGs),
-`serve` (backend + PWA). `--help` on each.
+ledger), `audit` (provenance + grounding trail), `pack` (export/harvest a
+shareable knowledge pack), `queue` (drain the phone queue), `load` (self-play a
+question bank), `guidelines` (harvest CPGs), `serve` (backend + PWA). `--help`
+on each.
+
+## Pack: distribute the map, not the corpus
+
+You can't legally share a corpus of copyrighted PDFs — but you can share the
+knowledge *about* it. `localevidence pack export` writes a **knowledge pack**: the
+**paper list** (bibliographic metadata), **summaries** of what each paper provides
+(your own words), and a **map** (topic clusters + a nearest-neighbour graph). No
+full text, no PDFs, no verbatim passages. Commit it to a public repo; anyone runs
+`localevidence pack harvest` to acquire the papers under their own access and
+**rebuild the corpus locally**. The compounding knowledge travels as a public good;
+the copyright stays home. See [`docs/PACK.md`](docs/PACK.md).
 
 ## Audit: every answer ships its trail
 
