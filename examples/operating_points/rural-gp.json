@@ -1,0 +1,9 @@
+{
+  "node": "rural-gp",
+  "base_rate": 0.02,
+  "cost_fn": 10.0,
+  "cost_fp": 4.0,
+  "resource_friction": 2.5,
+  "escalate_threshold": 0.6,
+  "notes": "Low prior of serious pathology; imaging is scarce and costly here (high friction) and over-investigation cascades, so the bar to investigate is high. Tune to YOUR population."
+}

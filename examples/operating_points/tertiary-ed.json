@@ -1,0 +1,9 @@
+{
+  "node": "tertiary-ed",
+  "base_rate": 0.15,
+  "cost_fn": 40.0,
+  "cost_fp": 2.0,
+  "resource_friction": 1.0,
+  "escalate_threshold": 0.6,
+  "notes": "Higher prior of serious pathology in a referred ED population; missing it is catastrophic (high cost_fn) and imaging is readily available (low friction), so the bar to investigate is low. Tune to YOUR population."
+}

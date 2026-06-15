@@ -117,6 +117,11 @@ def main(argv=None) -> int:
     el.add_argument("--limit", type=int, default=0, help="Run at most N items")
     el.add_argument("--out", default="eval-local.json", help="Write full results here")
 
+    opp = sub.add_parser("operating-point", help="Show the deterministic local operating-point decision for a probability (the settable dial a closed tool won't expose)")
+    opp.add_argument("--config", action="append", default=[], help="Per-node operating-point JSON (repeatable, to compare nodes)")
+    opp.add_argument("--prob", type=float, default=None, help="Pre-test probability of the dangerous condition (default: each node's base rate)")
+    opp.add_argument("--log", default=None, help="Summarise a decision log JSONL instead (per-node investigate-rate)")
+
     pk = sub.add_parser("pack", help="Distributable knowledge pack: shareable list + summaries + map (no corpus)")
     pk.add_argument("action", choices=["export", "harvest"], help="export a pack / harvest (rebuild) from one")
     pk.add_argument("dir", help="Pack directory (write for export, read for harvest)")
@@ -329,6 +334,31 @@ def main(argv=None) -> int:
         print(f"\n=== summary ({res['summary']['n']} items, {res['model']}) ===")
         print(_json.dumps({k: res[k] for k in ("lift", "summary", "rubric_summary") if k in res}, indent=2))
         print(f"full results -> {args.out}", file=sys.stderr)
+        return 0
+
+    if args.command == "operating-point":
+        from .operating_point import load_operating_point, decide
+        from .governance import DecisionLog
+        if args.log:
+            dl = DecisionLog(args.log)
+            nodes = sorted({r.get("node") for r in dl.records()})
+            if not nodes:
+                print("(no decisions logged yet)")
+            for n in nodes:
+                s = dl.summary(n)
+                print(f"{n}: n={s['n']}  investigate_rate={s['investigate_rate']}  "
+                      f"active_rate={s['active_rate']}  counts={s['counts']}")
+            return 0
+        if not args.config:
+            print("operating-point: pass --config <node.json> (repeatable), or --log <decisions.jsonl>",
+                  file=sys.stderr)
+            return 2
+        for cfg in args.config:
+            o = load_operating_point(cfg)
+            d = decide(o, args.prob)
+            print(f"[{o.node}] prob={d['prob']:.3f}  threshold={d['threshold']:.3f}  ->  "
+                  f"{d['action'].upper()}   (base_rate={o.base_rate}, cost_fn={o.cost_fn}, "
+                  f"cost_fp={o.cost_fp}, friction={o.resource_friction})")
         return 0
 
     if args.command == "pack":
