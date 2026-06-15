@@ -14,6 +14,9 @@ import sys
 
 
 def main(argv=None) -> int:
+    from .reasoning_profiles import PROFILES
+    _profile_names = sorted(PROFILES)
+
     parser = argparse.ArgumentParser(prog="localevidence")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -99,6 +102,7 @@ def main(argv=None) -> int:
     sy.add_argument("--harness", action="store_true", help="Full multi-stage harness (expand->draft->critique->revise->verify), not one-shot")
     sy.add_argument("--safe", action="store_true", help="Defence-in-depth: triage->inject safety rules->reason->safety-critic->abstain on unresolved critical risk")
     sy.add_argument("--gated", action="store_true", help="Capability gate: synthesise only if the task class is within the model's competence tier (LOCALEVIDENCE_MODEL_TIER); else refuse + return evidence")
+    sy.add_argument("--profile", default=None, choices=_profile_names, help="Reasoning discipline for --safe/--gated reasoning (default clinical-default; clinical-decision adds base-rate-first/mimic-exclusion/escalation-threshold)")
     sy.add_argument("--show-grounding", action="store_true", help="Print the grounding report (harness mode)")
 
     el = sub.add_parser("eval-local", help="Long-form eval: run the grounded harness over many questions on-device and score grounding (+ rubric completeness)")
@@ -107,6 +111,7 @@ def main(argv=None) -> int:
     el.add_argument("--model", default=None, help="Model spec e.g. ollama:qwen2.5:14b")
     el.add_argument("-k", "--passages", type=int, default=8)
     el.add_argument("--mode", default="grounded", choices=["grounded", "reasoning", "safe"], help="grounded (retrieval) / reasoning (scaffolded) / safe (defence-in-depth: rule-injection + safety-critic + abstain)")
+    el.add_argument("--profile", default=None, choices=_profile_names, help="Reasoning discipline for reasoning/safe modes (e.g. clinical-decision to eval the grounded+decision-profile arm)")
     el.add_argument("--baseline", action="store_true", help="Also run the one-shot control to isolate the harness lift")
     el.add_argument("--rubric", action="store_true", help="Score rubric completeness (needs --vignettes with rubrics)")
     el.add_argument("--limit", type=int, default=0, help="Run at most N items")
@@ -233,7 +238,8 @@ def main(argv=None) -> int:
         try:
             if args.gated:
                 from .capability import gated_answer
-                out = gated_answer(q, retrieve=retrieve, model=args.model, k=args.passages)
+                out = gated_answer(q, retrieve=retrieve, model=args.model,
+                                   k=args.passages, profile=args.profile)
                 if out["disposition"] == "answered":
                     print(out["answer"])
                     print(f"\n— gate: {out['tier']} tier / {out['task_class']} → answered",
@@ -250,7 +256,10 @@ def main(argv=None) -> int:
             if args.safe:
                 from .harness import reasoning_answer
                 from .safety import guarded_answer
-                out = guarded_answer(q, retrieve=retrieve, answer_fn=reasoning_answer,
+                _prof = args.profile
+                def _reason(qq, **kw):
+                    return reasoning_answer(qq, profile=_prof, **kw)
+                out = guarded_answer(q, retrieve=retrieve, answer_fn=_reason,
                                      model=args.model, k=args.passages)
                 if out["disposition"] != "served" and out.get("safety_note"):
                     print(f"⚠ [{out['disposition'].upper()}] {out['safety_note']}\n")
@@ -311,7 +320,7 @@ def main(argv=None) -> int:
         try:
             res = run_eval(items, retrieve=retrieve, model=args.model, k=args.passages,
                            baseline=args.baseline, rubric=args.rubric, mode=args.mode,
-                           on_result=progress)
+                           profile=args.profile, on_result=progress)
         except InferenceError as e:
             print(f"local eval unavailable: {e}", file=sys.stderr)
             return 1
