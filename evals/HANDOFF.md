@@ -25,7 +25,23 @@ question for a bigger box: does model size (or the reasoning lane) close it?
 - **qwen2.5:72b is NOT viable on 32 GB** — it loads at ~61 GB (CPU spill) and a
   single one-sentence call timed out at 600 s. Hence this handoff.
 
-## Run this on a box with ≥64 GB RAM (or a GPU; 72b-q4 ≈ 45-48 GB)
+## Shortcut: sweep grades via OpenRouter, no hardware needed
+
+You don't need a big box to *map* the capability-vs-safety curve. OpenRouter serves
+the same open-weight models you'd deploy locally (qwen, llama, …) behind one key, so
+you can sweep grades and simulate each local tier:
+```bash
+export OPENROUTER_API_KEY=...   # operator's own key
+for M in qwen/qwen-2.5-7b-instruct qwen/qwen-2.5-72b-instruct meta-llama/llama-3.3-70b-instruct; do
+  python3 -m localevidence eval-local --vignettes evals/clinical-reasoning.json \
+    --model openrouter:$M --mode reasoning --out eval-$(echo $M | tr / -).json
+done
+```
+This answers "does a 72B close the reasoning gap?" / "what's the smallest grade where
+safety errors hit zero?" without a 64 GB box. Caveat: provider quantization may differ
+slightly from a specific local quant — a close simulation, not bit-identical.
+
+## Or run locally on a box with ≥64 GB RAM (or a GPU; 72b-q4 ≈ 45-48 GB)
 ```bash
 ollama pull qwen2.5:72b          # and optionally qwen2.5:32b
 export LOCALEVIDENCE_PASSAGES=/path/to/passage/store   # see README "Run it fully local"
