@@ -81,6 +81,26 @@ def test_run_eval_survives_a_model_failure(monkeypatch):
     assert out["summary"]["n"] == 1   # only the successful item counts in the summary
 
 
+def test_run_eval_threads_profile_to_reasoning(monkeypatch):
+    # mode='reasoning' must carry the chosen profile into the reasoning lane, so the
+    # grounded+decision-profile arm can actually be evaluated.
+    from localevidence import harness
+    seen = {}
+    def fake_reason(q, *, retrieve, model=None, k=8, profile=None, constraints=""):
+        seen["profile"] = profile
+        return {"answer": "reasoned [s1#0]", "passages": list(retrieve(q, k)),
+                "n_passages": 1, "stages": ["frame", "retrieve", "draft", "verify"],
+                "grounding": {"coverage": 1.0, "hallucinated_citations": 0,
+                              "n_grounded": 1, "n_sentences": 1}}
+    monkeypatch.setattr(harness, "reasoning_answer", fake_reason)
+    p = [{"id": "s1#0", "paper": "P", "doi": "10/x", "text": "t"}]
+    out = ev.run_eval([{"id": "v1", "question": "Interpret this for my patient?"}],
+                      retrieve=lambda q, kk: p, model="ollama:x",
+                      mode="reasoning", profile="clinical-decision")
+    assert seen["profile"] == "clinical-decision"
+    assert out["rows"][0]["answer"] == "reasoned [s1#0]"
+
+
 def test_run_eval_with_mock(monkeypatch):
     from localevidence import harness, inference
     monkeypatch.setattr(inference, "generate",

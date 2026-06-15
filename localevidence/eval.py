@@ -85,19 +85,25 @@ def lift(harness_results: Sequence[dict], baseline_results: Sequence[dict]) -> d
 def run_eval(items: Sequence[Union[str, dict]], *,
              retrieve: Callable[[str, int], list[dict]],
              model: Optional[str] = None, k: int = 8, baseline: bool = False,
-             rubric: bool = False, mode: str = "grounded",
+             rubric: bool = False, mode: str = "grounded", profile=None,
              on_result: Optional[Callable[[int, dict], None]] = None) -> dict:
     """Run the harness over `items` (plain question strings, or vignette dicts with
     `question`/`rubric`/`type`/`id`). mode='grounded' (citation-optimised, for
-    retrieval) or 'reasoning' (scaffolded, for management/judgment/epi). Optionally
-    also the one-shot baseline and rubric-completeness scoring."""
+    retrieval) or 'reasoning' (scaffolded, for management/judgment/epi). `profile`
+    selects the reasoning discipline (reasoning/safe modes; e.g. 'clinical-decision'
+    to evaluate the grounded+decision-profile arm). Optionally also the one-shot
+    baseline and rubric-completeness scoring."""
     if mode == "safe":
         from . import safety
         def answer_fn(q, *, retrieve, model=None, k=8):
+            def _reason(qq, **kw):
+                return harness.reasoning_answer(qq, profile=profile, **kw)
             return safety.guarded_answer(q, retrieve=retrieve,
-                                         answer_fn=harness.reasoning_answer, model=model, k=k)
+                                         answer_fn=_reason, model=model, k=k)
     elif mode == "reasoning":
-        answer_fn = harness.reasoning_answer
+        def answer_fn(q, *, retrieve, model=None, k=8):
+            return harness.reasoning_answer(q, retrieve=retrieve, model=model, k=k,
+                                            profile=profile)
     else:
         answer_fn = harness.grounded_answer
     h_results, b_results, h_paired, rows = [], [], [], []

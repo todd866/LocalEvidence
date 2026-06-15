@@ -46,6 +46,25 @@ def test_gated_answer_refuses_reasoning_for_small_but_returns_evidence(monkeypat
     assert out["passages"] == p and "requires a clinician" in out["refusal"]
 
 
+def test_gated_answer_routes_allowed_reasoning_through_lane(monkeypatch):
+    # large tier + a reasoning class -> must go through the reasoning lane (not the
+    # factual one-shot synth), carrying the chosen profile.
+    monkeypatch.setattr(inference, "generate", lambda *a, **k: "epidemiological")
+    p = [{"id": "s1#0", "title": "P", "doi": "10/x", "text": "body"}]
+    seen = {}
+    def fake_reason(q, *, retrieve, model=None, k=8, profile=None):
+        seen["profile"] = profile
+        return {"answer": "reasoned [s1#0]", "passages": list(retrieve(q, k)),
+                "n_passages": 1, "grounding": {"coverage": 1.0}}
+    out = capability.gated_answer("interpret this result for my patient",
+                                  retrieve=lambda q, k: p, model="ollama:qwen2.5:72b",
+                                  reason_fn=fake_reason, profile="clinical-decision")
+    assert out["disposition"] == "answered" and out["answer"] == "reasoned [s1#0]"
+    assert out["task_class"] == "epidemiological" and out["tier"] == "large"
+    assert seen["profile"] == "clinical-decision"      # profile threaded to the lane
+    assert out["grounding"] == {"coverage": 1.0}        # lane's grounding report passed up
+
+
 def test_large_tier_may_reason(monkeypatch):
     monkeypatch.setattr(inference, "generate", lambda *a, **k: "management")
     out = capability.gate("manage this", model="ollama:qwen2.5:72b")

@@ -82,15 +82,30 @@ def gate(question: str, *, model: Optional[str] = None, tier: Optional[str] = No
 
 def gated_answer(question: str, *, retrieve: Callable[[str, int], list[dict]],
                  model: Optional[str] = None, tier: Optional[str] = None, k: int = 8,
-                 synth_fn: Optional[Callable] = None) -> dict:
-    """Gate, then either synthesise (in-tier) or refuse-with-evidence (above-tier)."""
+                 synth_fn: Optional[Callable] = None, reason_fn: Optional[Callable] = None,
+                 profile=None) -> dict:
+    """Gate, then route by what's permitted:
+      - in-tier FACTUAL  -> one-shot grounded synthesis (synth_fn);
+      - in-tier REASONING -> the scaffolded reasoning lane with `profile` (reason_fn);
+      - above tier        -> refuse, but still return the retrieved evidence.
+    The gate decides WHETHER reasoning is allowed; the profile decides HOW it's done."""
     g = gate(question, model=model, tier=tier)
-    passages = list(retrieve(question, k))
     if g["allowed"]:
+        if g["task_class"] in REASONING_CLASSES:
+            if reason_fn is None:
+                from . import harness          # lazy: avoid import cost when unused
+                reason_fn = harness.reasoning_answer
+            ans = reason_fn(question, retrieve=retrieve, model=model, k=k, profile=profile)
+            return {**g, "disposition": "answered", "answer": ans["answer"],
+                    "passages": ans.get("passages", []),
+                    "n_passages": ans.get("n_passages", len(ans.get("passages", []))),
+                    "grounding": ans.get("grounding")}
         synth = synth_fn or inference.synthesize_answer
+        passages = list(retrieve(question, k))
         ans = synth(question, passages, model=model)
         return {**g, "disposition": "answered", "answer": ans["answer"],
                 "passages": passages, "n_passages": len(passages)}
+    passages = list(retrieve(question, k))
     note = (f"Refused: this is a '{g['task_class']}' question, which a '{g['tier']}'-"
             "capability model is not permitted to answer here — it requires a clinician "
             "or a more capable model. The retrieved evidence below is provided for you "
