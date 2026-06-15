@@ -106,6 +106,9 @@ _DECISION = ReasoningProfile(
 PROFILES: dict[str, ReasoningProfile] = {p.name: p for p in (_DEFAULT, _DECISION)}
 DEFAULT_PROFILE = _DEFAULT
 
+# What callers may pass for `profile`: a name, a profile object, or None (default).
+ProfileArg = Optional[Union[str, ReasoningProfile]]
+
 
 def get_profile(profile: Optional[Union[str, ReasoningProfile]] = None) -> ReasoningProfile:
     """Resolve a profile: None -> the default; a ReasoningProfile -> itself; a name

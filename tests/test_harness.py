@@ -87,6 +87,36 @@ def test_reasoning_answer_runs_scaffold(monkeypatch):
     assert out["frame"]
 
 
+def test_frame_uses_decision_profile_dimensions(monkeypatch):
+    cap = {}
+    def fake(prompt, **k):
+        cap["p"] = prompt
+        return "framed"
+    monkeypatch.setattr(inference, "generate", fake)
+    harness.frame("Q?", model="ollama:x", profile="clinical-decision")
+    low = cap["p"].lower()
+    # the decision profile forces the dimensions core lacked
+    assert "mimic" in low and "escalate" in low and "discriminating" in low
+
+
+def test_reasoning_answer_threads_decision_profile(monkeypatch):
+    seen = []
+    def fake(prompt, *, system=None, model=None, **kw):
+        seen.append((prompt, system))
+        if "audit" in prompt.lower():
+            return "OK"                      # safety-check passes -> no revise
+        return "Reasoned answer [s1#0]."
+    monkeypatch.setattr(inference, "generate", fake)
+    out = harness.reasoning_answer("Pros and cons of test X?",
+                                   retrieve=lambda q, k: _passages(),
+                                   model="ollama:x", profile="clinical-decision")
+    # the decision profile's system prompt reached the reasoned draft
+    systems = [s for _, s in seen if s]
+    assert any("mimic" in s.lower() for s in systems)
+    # default profile still works (regression): no profile -> original behaviour
+    assert out["stages"] == ["frame", "retrieve", "draft", "safety-check", "verify"]
+
+
 def test_grounded_answer_no_passages_is_honest(monkeypatch):
     monkeypatch.setattr(inference, "generate", lambda *a, **k: "should not be called")
     out = harness.grounded_answer("Q?", retrieve=lambda q, k: [], model="ollama:x")
