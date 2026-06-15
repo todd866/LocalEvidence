@@ -1,5 +1,8 @@
+import numpy as np
+
+from localevidence import embedding
 from localevidence.acquire import AcquiredPaper
-from localevidence.index import PassageIndex, _is_low_value_chunk
+from localevidence.index import PassageIndex, _is_low_value_chunk, _downrank_low_value
 from localevidence.ledger import Ledger
 
 
@@ -16,6 +19,70 @@ def test_dosing_tables_are_kept_not_dropped():
     assert _is_low_value_chunk(refs) is True                  # reference dump
     grid = " ".join(["12.3", "4.5", "6.7", "8.9", "10.1", "2.2", "3.3"] * 4)
     assert _is_low_value_chunk(grid) is True                  # pure numeric grid, no doses
+
+
+def test_low_value_catches_vancouver_refs_and_contact_headers():
+    # Vancouver numbered refs WITHOUT doi.org / "et al" / "accessed" slipped the
+    # old filter — the live E. coli failure: a references chunk out-ranked the body.
+    vancouver = ("1. Smith J, Brown K. Acute pyelonephritis in children. Lancet. "
+                 "1976;1:490-495. 2. Jones A. Urinary tract infection. JAMA. 1982;3:120-130. "
+                 "3. Lee B. Pediatric nephrology. N Engl J Med. 1990;5:55-60. "
+                 "4. Park C. Renal scarring. Pediatrics. 2001;7:201-209.")
+    assert _is_low_value_chunk(vancouver) is True
+    # contact / affiliation header boilerplate (an email + an affiliation cue)
+    contact = ("Dr. Vanaja Kumar, Head of Department of Bacteriology, National "
+               "Institute for Research, Chennai 600031, India. "
+               "E-mail: vanajakumar@example.org")
+    assert _is_low_value_chunk(contact) is True
+    # real clinical prose that merely mentions a year is NOT flagged
+    prose = ("In a 2019 prospective cohort of children with febrile UTI, Escherichia "
+             "coli accounted for roughly 80 to 90 percent of isolates, and renal "
+             "scarring developed in a minority of confirmed pyelonephritis cases.")
+    assert _is_low_value_chunk(prose) is False
+
+
+def test_downrank_low_value_penalises_only_junk():
+    refs = ("1. A. Lancet. 1976;1:490-5. 2. B. JAMA. 1982;3:120-30. "
+            "3. C. N Engl J Med. 1990;5:55-60.")
+    body = "Escherichia coli is responsible for 80 to 90 percent of paediatric pyelonephritis."
+    fused = {1: 0.030, 2: 0.030}
+    out = _downrank_low_value(fused, {1: refs, 2: body}, factor=0.2)
+    assert out[2] == 0.030                # body untouched
+    assert out[1] == 0.030 * 0.2          # reference dump penalised
+    assert out[2] > out[1]                # body now outranks the junk
+
+
+def _inject_legacy(idx, *, slug, text, title="X", tier="article"):
+    """Insert a passage straight into the store, bypassing the index-time filter —
+    simulates junk indexed before the filter was strengthened (the real corpus)."""
+    pid = len(idx.meta)
+    idx._con.execute(
+        "INSERT INTO passages (passage_id,slug,title,doi,pmid,year,journal,tier,chunk_idx,text)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (pid, slug, title, "", "", "", "", tier, 99, text))
+    idx._con.execute("INSERT INTO fts(rowid,text) VALUES (?,?)", (pid, text))
+    idx._con.commit()
+    idx.meta.append({"passage_id": pid, "slug": slug, "title": title, "doi": "",
+                     "pmid": "", "year": "", "journal": "", "tier": tier, "chunk_idx": 99})
+    idx.vectors = np.vstack([idx.vectors, embedding.embed([text])])
+
+
+def test_search_downranks_legacy_reference_chunk(tmp_path):
+    body = tmp_path / "body.txt"
+    body.write_text("Escherichia coli causes most paediatric urinary tract infection "
+                    "and pyelonephritis in children. " * 40)
+    idx = PassageIndex(store_dir=tmp_path / "s")
+    idx.add_papers([AcquiredPaper(slug="uti", title="UTI overview",
+                                  text_path=str(body), tier="review")], verbose=False)
+    # a legacy references chunk for the SAME topic, sharing the query's tokens
+    ref = ("1. urinary tract infection pyelonephritis coli children. Lancet. 1976;1:490-5. "
+           "2. urinary coli children. JAMA. 1982;3:120-30. "
+           "3. pyelonephritis children. N Engl J Med. 1990;5:55-60.")
+    _inject_legacy(idx, slug="uti", text=ref)
+    res = idx.search("Escherichia coli urinary tract infection pyelonephritis children", k=5)
+    assert res
+    assert "1976;1:490" not in res[0].text           # the reference dump is NOT on top
+    assert any("1976;1:490" in r.text for r in res)   # but still retrievable (down-ranked, not dropped)
 
 
 def test_index_add_search_and_alignment(tmp_path):

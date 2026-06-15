@@ -39,21 +39,39 @@ _DOSING_RE = re.compile(
     r"\d\s*(?:mg|mcg|microgram|micrograms|units?|iu|ml|g)\b|\bmg/kg\b|\bmicrograms?/kg\b",
     re.I)
 
+# Vancouver / numbered-reference citation stamp: a year directly followed by a
+# volume ("1976;1", "2001;7:201"). A bibliography is full of these; clinical prose
+# that merely mentions a year is not. These slip the token filter above because a
+# numbered reference list need carry no "doi.org" / "et al" / "accessed".
+_REF_CITATION_RE = re.compile(r"\b(?:19|20)\d\d\s*[;:]\s*\d")
+# Contact / affiliation / correspondence boilerplate: an email address together
+# with an affiliation cue. Author-block headers, never clinical content.
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]{2,}")
+_AFFIL_RE = re.compile(
+    r"\b(e-?mail|correspond|department|faculty|professor|head of|institute|affiliation)\b")
+
 
 def _clean(text: str) -> str:
     return _PAGE_MARKER.sub(" ", text or "")
 
 
 def _is_low_value_chunk(text: str) -> bool:
-    """Drop reference lists, citation dumps, and dense numeric tables —
-    grounding a clinical claim in a bibliography or a stats grid is worse than
-    useless. Conservative, so real prose survives — and chunks carrying drug
-    doses are always kept (they look numeric-dense but are the point)."""
+    """Drop reference lists, citation dumps, contact/affiliation headers, and dense
+    numeric tables — grounding a clinical claim in a bibliography, an author block,
+    or a stats grid is worse than useless. Conservative, so real prose survives —
+    and chunks carrying drug doses are always kept (they look numeric-dense but are
+    the point)."""
     t = text or ""
     low = t.lower()
     ref_signals = (low.count("doi.org") + low.count("https://") +
                    low.count("et al") + low.count("accessed"))
     if ref_signals >= 4:
+        return True
+    # Vancouver / numbered reference lists (no doi.org/"et al"/"accessed" needed).
+    if len(_REF_CITATION_RE.findall(t)) >= 3:
+        return True
+    # Author / correspondence header boilerplate.
+    if _EMAIL_RE.search(t) and _AFFIL_RE.search(low):
         return True
     # Protect clinical dosing tables from the numeric-density filter below.
     if _DOSING_RE.search(t):
@@ -67,6 +85,20 @@ def _is_low_value_chunk(text: str) -> bool:
         if alpha_words / len(tokens) < 0.45:
             return True
     return False
+
+
+# Retrieval-time down-rank for boilerplate that slipped the index-time filter into
+# the EXISTING store (which can't be cheaply re-chunked). Multiplicative and gentle
+# enough to never empty a result set: if junk is all that matched, it still surfaces.
+_LOW_VALUE_PENALTY = 0.2
+
+
+def _downrank_low_value(fused: dict, texts: dict, factor: float = _LOW_VALUE_PENALTY) -> dict:
+    """Multiply the fused score of any boilerplate passage (reference list, contact
+    header, numeric grid) by `factor`, so body passages outrank junk already in the
+    store. Down-rank, never drop."""
+    return {pid: (sc * factor if _is_low_value_chunk(texts.get(pid, "")) else sc)
+            for pid, sc in fused.items()}
 
 
 @dataclass
@@ -238,6 +270,17 @@ class PassageIndex:
         except sqlite3.OperationalError:
             return []
 
+    def _texts_for(self, pids) -> dict:
+        """Batch-fetch passage text for a set of ids (for the retrieval-time
+        boilerplate down-rank). passage_id == rowid, so the IN-list is just ints."""
+        pids = list(pids)
+        if not pids:
+            return {}
+        ph = ",".join("?" * len(pids))
+        cur = self._con.execute(
+            f"SELECT passage_id,text FROM passages WHERE passage_id IN ({ph})", pids)
+        return {r[0]: r[1] for r in cur.fetchall()}
+
     def _passage(self, pid: int, sc: float, dense_rank, sparse_rank,
                  guaranteed: bool = False, cosine: float = 0.0) -> Optional[Passage]:
         row = self._con.execute(
@@ -277,6 +320,10 @@ class PassageIndex:
             fused[pid] = fused.get(pid, 0.0) + 1.0 / (rrf_k + i)
         if not fused:
             return []
+
+        # Down-rank boilerplate (reference lists, author headers, numeric grids)
+        # already in the store, so body passages aren't buried beneath it.
+        fused = _downrank_low_value(fused, self._texts_for(fused.keys()))
 
         top = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:k]
         out = [p for p in (self._passage(pid, sc, dense_rank.get(pid), sparse_rank.get(pid),
