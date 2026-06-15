@@ -50,15 +50,25 @@ def parse_model(spec: Optional[str]) -> tuple[Optional[str], Optional[str]]:
 def generate(prompt: str, *, system: Optional[str] = None,
              model: Optional[str] = None, host: Optional[str] = None,
              timeout: int = DEFAULT_TIMEOUT) -> str:
-    """Generate text from the configured backend. Currently: ollama (local)."""
+    """Generate text from the configured backend.
+
+    `ollama:<name>` is local and free (the default stack). `anthropic:<model>` and
+    `openai:<model>` are OPTIONAL paid-API backends for the cross-model evaluation
+    arm only — off by default, the operator supplies their own key via
+    ANTHROPIC_API_KEY / OPENAI_API_KEY. They exist so the same harness can compare
+    how any AI handles a grounded question; they do not change the free-local core."""
     backend, name = parse_model(model)
     if backend == "ollama":
         return _ollama_chat(name, prompt, system, host or OLLAMA_HOST, timeout)
+    if backend == "anthropic":
+        return _anthropic_chat(name, prompt, system, timeout)
+    if backend == "openai":
+        return _openai_chat(name, prompt, system, timeout)
     if backend in (None, "manual", "claude"):
         raise InferenceError(
-            "no local model configured — set LOCALEVIDENCE_MODEL=ollama:<name> "
-            "(e.g. ollama:qwen2.5:14b) or pass model=...; the zero-config default "
-            "is Claude-in-the-loop synthesis (read the evidence pack yourself).")
+            "no model backend configured — set LOCALEVIDENCE_MODEL=ollama:<name> "
+            "(e.g. ollama:qwen2.5:14b), or pass model=anthropic:<m> / openai:<m> for "
+            "the eval arm; the zero-config default is Claude-in-the-loop synthesis.")
     raise InferenceError(f"unknown inference backend: {backend!r}")
 
 
@@ -79,6 +89,49 @@ def _ollama_chat(name: Optional[str], prompt: str, system: Optional[str],
             f"ollama request failed (host={host}, model={name}): {e}. "
             f"Is `ollama serve` running and the model pulled (`ollama pull {name}`)?")
     return ((data.get("message") or {}).get("content") or "").strip()
+
+
+def _post_json(url: str, headers: dict, payload: dict, timeout: int, what: str) -> dict:
+    body = json.dumps(payload).encode()
+    req = urllib.request.Request(url, data=body, headers={**headers, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.load(r)
+    except Exception as e:  # auth, rate-limit, network, bad model
+        raise InferenceError(f"{what} request failed (model in spec): {e}")
+
+
+def _anthropic_chat(name: Optional[str], prompt: str, system: Optional[str],
+                    timeout: int, max_tokens: int = 2048) -> str:
+    if not name:
+        raise InferenceError("anthropic backend needs a model, e.g. anthropic:claude-sonnet-4-6")
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        raise InferenceError("anthropic backend needs ANTHROPIC_API_KEY (operator-supplied; eval arm only)")
+    payload = {"model": name, "max_tokens": max_tokens,
+               "messages": [{"role": "user", "content": prompt}]}
+    if system:
+        payload["system"] = system
+    data = _post_json("https://api.anthropic.com/v1/messages",
+                      {"x-api-key": key, "anthropic-version": "2023-06-01"},
+                      payload, timeout, "anthropic")
+    parts = [b.get("text", "") for b in (data.get("content") or []) if b.get("type") == "text"]
+    return "".join(parts).strip()
+
+
+def _openai_chat(name: Optional[str], prompt: str, system: Optional[str],
+                 timeout: int) -> str:
+    if not name:
+        raise InferenceError("openai backend needs a model, e.g. openai:gpt-4o")
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        raise InferenceError("openai backend needs OPENAI_API_KEY (operator-supplied; eval arm only)")
+    messages = ([{"role": "system", "content": system}] if system else []) + \
+        [{"role": "user", "content": prompt}]
+    data = _post_json("https://api.openai.com/v1/chat/completions",
+                      {"Authorization": f"Bearer {key}"},
+                      {"model": name, "messages": messages}, timeout, "openai")
+    return ((data.get("choices") or [{}])[0].get("message", {}).get("content") or "").strip()
 
 
 def _format_passages(passages: Sequence[dict]) -> str:

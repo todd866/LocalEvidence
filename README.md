@@ -102,6 +102,12 @@ model + local inference — then runs on-prem, private, and inspectable, which i
 the strongest substrate for treating the *deployment*, not the model's
 capability, as the safety variable.
 
+**Comparing models (optional, eval only).** The model is a swappable backend, so
+the same grounded question can be put to *any* AI to compare how each handles it:
+`ollama:<name>` (local, free), or — opt-in, with your own key — `anthropic:<model>`
+(`ANTHROPIC_API_KEY`) / `openai:<model>` (`OPENAI_API_KEY`). The paid backends exist
+purely for the cross-model evaluation arm; they don't change the free-local core.
+
 ## Quickstart
 
 ```bash

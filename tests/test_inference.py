@@ -50,6 +50,46 @@ def test_generate_ollama_path(monkeypatch):
     assert captured["body"]["messages"][0]["role"] == "system"
 
 
+def test_anthropic_backend(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    cap = {}
+    def fake_urlopen(req, timeout=0):
+        cap["url"] = req.full_url
+        cap["key"] = req.get_header("X-api-key")
+        cap["body"] = json.loads(req.data)
+        return _FakeResp({"content": [{"type": "text", "text": "grounded reply"}]})
+    monkeypatch.setattr(inference.urllib.request, "urlopen", fake_urlopen)
+    out = inference.generate("Q?", system="sys", model="anthropic:claude-sonnet-4-6")
+    assert out == "grounded reply"
+    assert cap["url"].endswith("/v1/messages") and cap["key"] == "sk-test"
+    assert cap["body"]["model"] == "claude-sonnet-4-6" and cap["body"]["system"] == "sys"
+
+
+def test_anthropic_missing_key(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(inference.InferenceError):
+        inference.generate("Q?", model="anthropic:claude-sonnet-4-6")
+
+
+def test_openai_backend(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    cap = {}
+    def fake_urlopen(req, timeout=0):
+        cap["url"] = req.full_url
+        cap["auth"] = req.get_header("Authorization")
+        return _FakeResp({"choices": [{"message": {"content": "gpt reply"}}]})
+    monkeypatch.setattr(inference.urllib.request, "urlopen", fake_urlopen)
+    out = inference.generate("Q?", model="openai:gpt-4o")
+    assert out == "gpt reply"
+    assert cap["url"].endswith("/v1/chat/completions") and cap["auth"] == "Bearer sk-test"
+
+
+def test_openai_missing_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(inference.InferenceError):
+        inference.generate("Q?", model="openai:gpt-4o")
+
+
 def test_format_passages_numbers_and_cites():
     txt = inference._format_passages(
         [{"id": "s1#3", "paper": "Paper One", "doi": "10.1/x", "text": "the dose is 50 mg/kg"}])
