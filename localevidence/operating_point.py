@@ -1,9 +1,11 @@
 """The local operating point — the settable, inspectable dial a closed product won't expose.
 
 The companion study's load-bearing result is that safety is a property of the
-deployment CONFIG, not the model, and that the right config is LOCAL: the base
-rate is a property of the node (a rural GP vs a tertiary clinic), and what's
-warranted also depends on local costs and resources. This module makes that dial
+deployment CONFIG, not the model, and that the config that could be safe is
+necessarily LOCAL: the base rate is a property of the node (a rural GP vs a
+tertiary clinic), and what's warranted also depends on local costs and resources.
+So the dial must be local and inspectable; whether a given setting is safe is on
+whoever sets it. This module makes that dial
 real — and, crucially, ENFORCED BY CODE rather than coaxed from a model.
 
 The separation of concerns is the whole point:
@@ -18,7 +20,7 @@ every decision is attributable to a specific, version-controlled setting.
 
 The rule is the standard decision threshold (Pauker & Kassirer, NEJM 1975): act
 when the probability of the dangerous condition exceeds
-    t* = cost_fp / (cost_fp + cost_fn),
+    t* = (cost_fp * resource_friction) / (cost_fp * resource_friction + cost_fn),
 i.e. raising the cost of a missed diagnosis (cost_fn) lowers the bar to investigate;
 raising the cost/scarcity of over-investigation (cost_fp, resource_friction) raises it.
 
@@ -30,6 +32,7 @@ is automatically better. See [[localevidence-capability-gate-safety]].
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional, Union
@@ -47,14 +50,18 @@ class OperatingPoint:
     notes: str = ""
 
     def __post_init__(self):
-        if not 0.0 <= self.base_rate <= 1.0:
-            raise ValueError(f"base_rate must be in [0,1], got {self.base_rate}")
-        if self.cost_fn <= 0 or self.cost_fp <= 0:
-            raise ValueError("cost_fn and cost_fp must be positive")
-        if self.resource_friction <= 0:
-            raise ValueError("resource_friction must be positive")
-        if not 0.0 < self.escalate_threshold <= 1.0:
-            raise ValueError("escalate_threshold must be in (0,1]")
+        if not (math.isfinite(self.base_rate) and 0.0 <= self.base_rate <= 1.0):
+            raise ValueError(f"base_rate must be a finite number in [0,1], got {self.base_rate}")
+        # cost/friction must be finite AND positive — a NaN slips a bare `> 0` check
+        # (every NaN comparison is False) and would yield a NaN threshold that silently
+        # routes every case to 'watch'.
+        for name in ("cost_fn", "cost_fp", "resource_friction"):
+            v = getattr(self, name)
+            if not (math.isfinite(v) and v > 0):
+                raise ValueError(f"{name} must be a finite positive number, got {v}")
+        if not (math.isfinite(self.escalate_threshold) and 0.0 < self.escalate_threshold <= 1.0):
+            raise ValueError(
+                f"escalate_threshold must be a finite number in (0,1], got {self.escalate_threshold}")
 
     @classmethod
     def from_dict(cls, d: dict) -> "OperatingPoint":
@@ -82,7 +89,11 @@ def decide(op: OperatingPoint, prob: Optional[float] = None) -> dict:
     if not 0.0 <= p <= 1.0:
         raise ValueError(f"prob must be in [0,1], got {p}")
     t = action_threshold(op)
-    if p >= op.escalate_threshold:
+    # Escalate only AT OR ABOVE the investigate bar. A node may set escalate_threshold
+    # below t*, but escalating where you wouldn't even investigate is incoherent — so the
+    # effective escalate point is max(t*, escalate_threshold). The ladder is then monotone
+    # in p for every configuration: watch -> investigate -> escalate.
+    if p >= max(t, op.escalate_threshold):
         action = "escalate"
     elif p >= t:
         action = "investigate"

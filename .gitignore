@@ -12,6 +12,10 @@ localevidence/paperscope/
 data/library/
 data/passages/
 
+# Governance decision log (per-node decisions; question text is hashed by default,
+# but never commit the store).
+data/governance/
+
 # The knowledge ledger (your worked questions + answers + reasoning).
 ledger/
 

@@ -73,3 +73,63 @@ def test_invalid_operating_point_rejected():
         op.OperatingPoint(node="x", base_rate=1.5, cost_fn=1.0, cost_fp=1.0)   # prob > 1
     with pytest.raises(ValueError):
         op.OperatingPoint(node="x", base_rate=0.1, cost_fn=0.0, cost_fp=1.0)   # zero cost
+
+
+def test_non_finite_fields_rejected():
+    # NaN slips a bare `> 0` check and would make the threshold NaN -> silent 'watch'.
+    for bad in (float("nan"), float("inf")):
+        with pytest.raises(ValueError):
+            op.OperatingPoint(node="x", base_rate=0.1, cost_fn=bad, cost_fp=1.0)
+        with pytest.raises(ValueError):
+            op.OperatingPoint(node="x", base_rate=0.1, cost_fn=1.0, cost_fp=bad)
+        with pytest.raises(ValueError):
+            op.OperatingPoint(node="x", base_rate=0.1, cost_fn=1.0, cost_fp=1.0, resource_friction=bad)
+
+
+def test_escalate_never_fires_below_the_investigate_bar():
+    # the must-fix: a node may set escalate_threshold < t*, but it must NEVER recommend
+    # escalate (treat outright) at a probability where it wouldn't even investigate.
+    o = _node(cost_fn=1.0, cost_fp=50.0, escalate_threshold=0.1)   # t* ~= 0.98, esc=0.1
+    assert op.action_threshold(o) > 0.9
+    assert op.decide(o, 0.20)["action"] == "watch"        # NOT escalate (the old bug)
+    assert op.decide(o, 0.99)["action"] == "escalate"
+    # normal ordering still holds when escalate_threshold >= t*
+    o2 = _node(cost_fn=50.0, cost_fp=1.0, escalate_threshold=0.6)  # t* ~= 0.02
+    assert op.decide(o2, 0.10)["action"] == "investigate"
+    assert op.decide(o2, 0.70)["action"] == "escalate"
+
+
+def test_decide_rejects_out_of_range_probability():
+    o = _node()
+    for bad in (1.5, -0.1, float("nan")):
+        with pytest.raises(ValueError):
+            op.decide(o, bad)
+
+
+def test_decide_boundary_inclusivity():
+    o = _node(cost_fn=1.0, cost_fp=1.0, escalate_threshold=0.6)    # t* = 0.5
+    assert op.decide(o, 0.5)["action"] == "investigate"           # p == t* -> investigate
+    assert op.decide(o, 0.4999)["action"] == "watch"
+    assert op.decide(o, 0.6)["action"] == "escalate"              # p == escalate -> escalate
+
+
+def test_action_threshold_strictly_monotone_under_sweeps():
+    # back the headline "monotonically" claim with an actual sweep, not 2 spot checks
+    prev = None
+    for cfn in range(1, 60):
+        t = op.action_threshold(_node(cost_fn=float(cfn), cost_fp=1.0))
+        if prev is not None:
+            assert t < prev          # higher cost_fn -> strictly lower threshold
+        prev = t
+    prev = None
+    for cfp in range(1, 60):
+        t = op.action_threshold(_node(cost_fn=10.0, cost_fp=float(cfp)))
+        if prev is not None:
+            assert t > prev          # higher cost_fp -> strictly higher threshold
+        prev = t
+    prev = None
+    for fr in range(1, 60):
+        t = op.action_threshold(_node(cost_fn=10.0, cost_fp=1.0, resource_friction=float(fr)))
+        if prev is not None:
+            assert t > prev          # higher friction -> strictly higher threshold
+        prev = t

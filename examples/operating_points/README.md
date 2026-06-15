@@ -3,8 +3,10 @@
 A closed clinical-AI product bakes in one calibration and applies it everywhere;
 its clearest symptom is over-investigation (recommending imaging far more widely
 than a given setting's prevalence and resources warrant), with no way to dial it
-back. But the safe operating point is **local**: it depends on the base rate and
-the costs of the specific deployment node.
+back. But the operating point that *could* be safe is necessarily **local**: it
+depends on the base rate and the costs of the specific deployment node, so the
+dial must be local and inspectable. Whether any given local setting is actually
+safe is on whoever sets it.
 
 Each file here is one node's operating point — plain text, version-controllable,
 inspectable. It sets:
@@ -27,7 +29,8 @@ investigate when  prob >= cost_fp * friction / (cost_fp * friction + cost_fn)
 So the dial moves the recommendation **monotonically and reproducibly**. See it:
 
 ```bash
-# same patient probability, two nodes -> different, locally-correct action
+# same patient probability, two nodes -> different action (the dial steers it;
+# whether that action is RIGHT depends on whether the dial is set right)
 python3 -m localevidence operating-point \
     --config examples/operating_points/rural-gp.json \
     --config examples/operating_points/tertiary-ed.json \

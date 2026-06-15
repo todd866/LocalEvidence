@@ -19,6 +19,7 @@ the setting is explicit, bounded, and auditable, not that it is automatically ri
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from datetime import datetime
@@ -27,7 +28,14 @@ from typing import Callable, Optional, Union
 
 from . import config, inference, operating_point
 
-_NUM_RE = re.compile(r"\d+(?:\.\d+)?")
+# Anchored probability forms. A bare integer ("1", "100") is deliberately NOT a
+# probability — it is usually a step number / count / differential rank, and
+# clamping it to 0.0/1.0 is the worst possible failure (always-watch / always-
+# escalate). So we read only an explicit percentage, an "N in M" ratio, or a
+# decimal fraction.
+_PCT_RE = re.compile(r"(\d+(?:\.\d+)?)\s?(?:%|percent|per cent)", re.I)
+_RATIO_RE = re.compile(r"\b(\d+(?:\.\d+)?)\s+in\s+(\d+(?:\.\d+)?)\b", re.I)
+_DEC_RE = re.compile(r"(?<![\d.])\d?\.\d+")
 
 
 # ── per-node decision log (monitoring + attributability) ────────────────────
@@ -84,12 +92,21 @@ def _now() -> str:
 def govern(op: operating_point.OperatingPoint, prob: Optional[float], *,
            log: Optional[DecisionLog] = None, question: Optional[str] = None,
            task_class: Optional[str] = None, tier: Optional[str] = None,
-           at: Optional[str] = None) -> dict:
+           at: Optional[str] = None, keep_question: bool = False) -> dict:
     """Apply the deterministic dial to a probability and record the decision (with
-    its inputs + the dial) to the log, for monitoring and attribution."""
+    its inputs + the dial) to the log, for monitoring and attribution.
+
+    Privacy: the raw `question` is NOT persisted by default — only a salted-free
+    sha256 prefix + length, enough to dedupe/correlate without storing PHI. Pass
+    keep_question=True only for a trusted, gitignored local audit store."""
     decision = operating_point.decide(op, prob)
-    record = {**decision, "question": question, "task_class": task_class,
-              "tier": tier, "at": at or _now()}
+    record = {**decision, "task_class": task_class, "tier": tier, "at": at or _now()}
+    if question is not None:
+        if keep_question:
+            record["question"] = question
+        else:
+            record["question_sha"] = hashlib.sha256(question.encode()).hexdigest()[:16]
+            record["question_len"] = len(question)
     if log is not None:
         log.append(record)
     return record
@@ -113,19 +130,36 @@ def estimate_probability(question: str, *, retrieve: Optional[Callable] = None,
         raw = inference.generate(prompt, model=model)
     except inference.InferenceError:
         return None
-    nums = [float(x) for x in _NUM_RE.findall(raw)]
-    for n in nums:
-        if 0.0 <= n <= 1.0:
-            return n
-    for n in nums:               # tolerate a percentage ("12%")
-        if 1.0 < n <= 100.0:
-            return n / 100.0
+    return parse_probability(raw)
+
+
+def parse_probability(text: str) -> Optional[float]:
+    """Extract a probability in [0,1] from free text, anchored to explicit forms (a
+    percentage, an 'N in M' ratio, or a decimal fraction). Returns None when nothing
+    trustworthy is present, so the caller falls back to the node's base rate rather
+    than acting on a misparsed bare integer."""
+    m = _PCT_RE.search(text)
+    if m:
+        v = float(m.group(1))
+        if 0.0 <= v <= 100.0:
+            return v / 100.0
+    m = _RATIO_RE.search(text)
+    if m:
+        a, b = float(m.group(1)), float(m.group(2))
+        if b > 0 and 0.0 <= a <= b:
+            return a / b
+    m = _DEC_RE.search(text)
+    if m:
+        v = float(m.group(0))
+        if 0.0 <= v <= 1.0:
+            return v
     return None
 
 
-def _default_gate(question: str, *, model: Optional[str] = None) -> dict:
+def _default_gate(question: str, *, model: Optional[str] = None,
+                  tier: Optional[str] = None) -> dict:
     from . import capability
-    return capability.gate(question, model=model)
+    return capability.gate(question, model=model, tier=tier)
 
 
 def governed_answer(question: str, op: operating_point.OperatingPoint, *,
@@ -133,12 +167,13 @@ def governed_answer(question: str, op: operating_point.OperatingPoint, *,
                     log: Optional[DecisionLog] = None,
                     gate_fn: Optional[Callable] = None,
                     estimate_fn: Optional[Callable] = None,
+                    tier: Optional[str] = None, keep_question: bool = False,
                     at: Optional[str] = None) -> dict:
     """Full governed path: GATE (may the model reason here?) -> estimate the
     probability -> DETERMINISTIC dial decides the action -> log it. If the gate
     refuses, no decision is made or logged (a probability from an untrusted model
-    must not drive an action)."""
-    g = (gate_fn or _default_gate)(question, model=model)
+    must not drive an action). `tier` pins the capability tier explicitly."""
+    g = (gate_fn or _default_gate)(question, model=model, tier=tier)
     if not g.get("allowed"):
         return {"disposition": "refused", "gate": g, "operating_point": op.to_dict(),
                 "refusal": (f"Refused: a '{g.get('task_class')}' question needs a capable "
@@ -147,5 +182,6 @@ def governed_answer(question: str, op: operating_point.OperatingPoint, *,
                             "estimate exists.")}
     prob = (estimate_fn or estimate_probability)(question, retrieve=retrieve, model=model)
     record = govern(op, prob, log=log, question=question,
-                    task_class=g.get("task_class"), tier=g.get("tier"), at=at)
+                    task_class=g.get("task_class"), tier=g.get("tier"),
+                    keep_question=keep_question, at=at)
     return {"disposition": "decided", "gate": g, "decision": record, "estimated_prob": prob}
