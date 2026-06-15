@@ -18,6 +18,26 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]               # repo root
 PROJECTS = ROOT / "projects"
 
+
+def load_dotenv(path: Path) -> None:
+    """Load KEY=value lines from a gitignored .env into the environment, so an
+    operator can keep keys (LOCALEVIDENCE_EMAIL, *_API_KEY, …) in one local file.
+    `setdefault` means a real exported env var always wins; missing file is a no-op.
+    Mirrors how paperscope/shadow.py loads PaperLibrary/.env."""
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+# Load the gitignored .env BEFORE the os.environ reads below. Override its
+# location with LOCALEVIDENCE_ENV.
+load_dotenv(Path(os.environ.get("LOCALEVIDENCE_ENV", ROOT / ".env")))
+
 # The durable local paper store (catalog + PDFs + extracted text + the passage
 # index). Keep it out of the repo by default; override with LOCALEVIDENCE_LIBRARY.
 LIBRARY_ROOT = Path(

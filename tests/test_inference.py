@@ -18,7 +18,8 @@ class _FakeResp:
         return False
 
 
-def test_parse_model():
+def test_parse_model(monkeypatch):
+    monkeypatch.setattr(inference, "DEFAULT_MODEL", "")  # deterministic regardless of a local .env
     assert inference.parse_model("ollama:qwen2.5:14b") == ("ollama", "qwen2.5:14b")
     assert inference.parse_model("") == (None, None)
     assert inference.parse_model(None) == (None, None)  # falls to DEFAULT_MODEL ("")

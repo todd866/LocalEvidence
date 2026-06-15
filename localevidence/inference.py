@@ -18,6 +18,8 @@ import os
 import urllib.request
 from typing import Optional, Sequence
 
+from . import config  # noqa: F401 — importing loads the gitignored .env (keys/model)
+
 DEFAULT_MODEL = os.environ.get("LOCALEVIDENCE_MODEL", "")   # e.g. "ollama:qwen2.5:14b"
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 # Local generation can be slow under memory pressure (big model, long prompt). A

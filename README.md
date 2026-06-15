@@ -207,7 +207,10 @@ with CPython. First run downloads the MiniLM model (~90 MB) once.
 lives under the repo by default, so run from a clone (`pip install -e .` just adds
 the `localevidence` command). To keep state elsewhere, point the env vars at it:
 `LOCALEVIDENCE_PASSAGES` (passage index), `LOCALEVIDENCE_LIBRARY` (paper store),
-`LOCALEVIDENCE_MODEL` (local model), `LOCALEVIDENCE_EMAIL` (OA contact).
+`LOCALEVIDENCE_MODEL` (local model), `LOCALEVIDENCE_EMAIL` (OA contact). Easiest:
+`cp .env.example .env` and fill it in — the gitignored `.env` is auto-loaded at
+startup (a real exported env var always overrides it), and it's where the optional
+`OPENROUTER_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` live too.
 
 ## Dogfooding: run this repo, improve this repo
 
