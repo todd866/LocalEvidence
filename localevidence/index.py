@@ -40,10 +40,13 @@ _DOSING_RE = re.compile(
     re.I)
 
 # Vancouver / numbered-reference citation stamp: a year directly followed by a
-# volume ("1976;1", "2001;7:201"). A bibliography is full of these; clinical prose
-# that merely mentions a year is not. These slip the token filter above because a
-# numbered reference list need carry no "doi.org" / "et al" / "accessed".
-_REF_CITATION_RE = re.compile(r"\b(?:19|20)\d\d\s*[;:]\s*\d")
+# volume, in either "1976;1" or comma "2016, 11" style. A bibliography is full of
+# these; clinical prose that merely mentions a year is not. They slip the token
+# filter above because a numbered reference list need carry no "doi.org"/"et al".
+_REF_CITATION_RE = re.compile(r"\b(?:19|20)\d\d\s*[;,:]\s*\d")
+# Bare DOI (no "doi.org/" prefix), e.g. "10.1371/journal.pone...". A few of these
+# in one chunk is a reference list, regardless of how the citations are punctuated.
+_BARE_DOI_RE = re.compile(r"\b10\.\d{4,9}/")
 # Contact / affiliation / correspondence boilerplate: an email address together
 # with an affiliation cue. Author-block headers, never clinical content.
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]{2,}")
@@ -63,12 +66,14 @@ def _is_low_value_chunk(text: str) -> bool:
     the point)."""
     t = text or ""
     low = t.lower()
+    bare_dois = len(_BARE_DOI_RE.findall(t))
     ref_signals = (low.count("doi.org") + low.count("https://") +
-                   low.count("et al") + low.count("accessed"))
+                   low.count("et al") + low.count("accessed") + bare_dois)
     if ref_signals >= 4:
         return True
-    # Vancouver / numbered reference lists (no doi.org/"et al"/"accessed" needed).
-    if len(_REF_CITATION_RE.findall(t)) >= 3:
+    # Vancouver / numbered reference lists (no doi.org/"et al"/"accessed" needed),
+    # or a cluster of bare DOIs — both mark a bibliography however it's punctuated.
+    if len(_REF_CITATION_RE.findall(t)) >= 3 or bare_dois >= 3:
         return True
     # Author / correspondence header boilerplate.
     if _EMAIL_RE.search(t) and _AFFIL_RE.search(low):

@@ -41,6 +41,25 @@ def test_low_value_catches_vancouver_refs_and_contact_headers():
     assert _is_low_value_chunk(prose) is False
 
 
+def test_low_value_catches_comma_vancouver_and_bare_doi():
+    # real failure from the live corpus: a references chunk with COMMA-style
+    # Vancouver citations and bare DOIs (no doi.org / "et al") that out-ranked the
+    # E. coli body sentence at retrieval.
+    refs = ("analyses of prevalence data. PLoS One. 2016, 11:e0164306. "
+            "10.1371/journal.pone.0164306 Roberts KB: Urinary tract infection: "
+            "clinical practice guideline. Pediatrics. 2011, 128:595-610. "
+            "10.1542/peds.20111330 Bryce A: Global prevalence. BMJ. 2016, 352:i939. "
+            "10.1136/bmj.i939")
+    assert _is_low_value_chunk(refs) is True
+    # a chunk that mixes a methods / article-history header WITH the actual answer
+    # must be KEPT — down-ranking it would bury the fact it carries.
+    mixed = ("ARTICLE HISTORY Received: August 29 2018 Accepted: December 26, 2018 "
+             "DOI: 10.2174/1872213X13666181228154940 Results: Escherichia coli "
+             "accounts for 80 to 90% of UTI in children. Unexplained fever is the "
+             "most common symptom of UTI during the first two years of life.")
+    assert _is_low_value_chunk(mixed) is False
+
+
 def test_downrank_low_value_penalises_only_junk():
     refs = ("1. A. Lancet. 1976;1:490-5. 2. B. JAMA. 1982;3:120-30. "
             "3. C. N Engl J Med. 1990;5:55-60.")
