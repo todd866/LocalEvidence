@@ -236,10 +236,6 @@ text extraction, title verification, OA acquisition, chunking). A fuller private
 deployment can point at a larger private library and add the last-resort tier
 above; this repository runs standalone with neither.
 
-## Related
-
-This project is part of an experiment in agent-to-agent capability sharing. See the [Trustlist protocol](https://github.com/todd866/trustlist): a web of trust where trust is a prior and your own verification is the truth.
-
 ## License
 
 MIT — see [`LICENSE`](LICENSE). The code is MIT; the medical literature it
