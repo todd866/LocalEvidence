@@ -68,22 +68,52 @@ def _clean_html(raw: str) -> str:
     return re.sub(r"\n{2,}", "\n", h).strip()
 
 
-def crawl_rch_index(session: requests.Session) -> list[tuple[str, str, str]]:
-    """Return (name, title, url) for every RCH clinical practice guideline."""
-    r = session.get(RCH_INDEX, timeout=30)
+# Guideline sources. Adding one is a config entry: index URL, base, a regex that
+# captures (path, name[, title]) per guideline link, an optional skip set, and a
+# slug prefix. The crawl/harvest/index machinery below is source-agnostic, so the
+# library grows toward the local convention-setters one small config entry at a time.
+SOURCES: dict[str, dict] = {
+    "rch": {
+        "source": "guideline:rch",
+        "journal": "RCH Clinical Practice Guidelines",
+        "index_url": RCH_INDEX, "base": RCH_BASE, "slug_prefix": "rch-",
+        "link_re": r"href=['\"](/clinicalguide/guideline_index/([A-Za-z][^/'\"#?]+)/?)['\"][^>]*>([^<]+)</a>",
+        "skip": _RCH_SKIP,
+    },
+    "aih": {  # Australian Immunisation Handbook — NIP schedule + per-disease vaccine specifics
+        "source": "guideline:aih",
+        "journal": "Australian Immunisation Handbook",
+        "index_url": "https://immunisationhandbook.health.gov.au/contents/vaccine-preventable-diseases",
+        "base": "https://immunisationhandbook.health.gov.au", "slug_prefix": "aih-",
+        "link_re": r"href=['\"](/contents/vaccine-preventable-diseases/([a-z0-9][a-z0-9-]+))['\"]",
+        "skip": set(),
+    },
+}
+
+
+def crawl_index(session: requests.Session, cfg: dict) -> list[tuple[str, str, str]]:
+    """Return (name, title, url) for every guideline link on a source's index.
+    The link regex captures (path, name) and optionally (title); when the title
+    is not in the href, it is derived from the name."""
+    r = session.get(cfg["index_url"], timeout=30)
     r.raise_for_status()
     out: list[tuple[str, str, str]] = []
     seen: set[str] = set()
-    for m in re.finditer(
-        r"href=['\"](/clinicalguide/guideline_index/([A-Za-z][^/'\"#?]+)/?)['\"][^>]*>([^<]+)</a>",
-        r.text,
-    ):
-        path, name, title = m.group(1), m.group(2), _html.unescape(m.group(3)).strip()
-        if name in _RCH_SKIP or name in seen:
+    for m in re.finditer(cfg["link_re"], r.text):
+        g = m.groups()
+        path, name = g[0], g[1]
+        title = (_html.unescape(g[2]).strip() if len(g) > 2 and g[2]
+                 else name.replace("-", " ").title())
+        if name in cfg.get("skip", set()) or name in seen:
             continue
         seen.add(name)
-        out.append((name, title, RCH_BASE + path))
+        out.append((name, title, cfg["base"] + path))
     return out
+
+
+def crawl_rch_index(session: requests.Session) -> list[tuple[str, str, str]]:
+    """Back-compat alias — RCH via the generic crawler."""
+    return crawl_index(session, SOURCES["rch"])
 
 
 def _store_text(slug: str, title: str, text: str, *, source: str,
@@ -96,26 +126,31 @@ def rch_slug(name: str) -> str:
     return "rch-" + re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
-def harvest_rch(*, limit: int = 0, pace_s: float = 0.7, refresh: bool = False,
-                min_chars: int = 500, verbose: bool = True) -> dict:
-    """Crawl + fetch + catalogue the RCH CPG set. Returns a summary."""
+def harvest(source: str = "rch", *, limit: int = 0, pace_s: float = 0.7,
+            refresh: bool = False, min_chars: int = 500, verbose: bool = True) -> dict:
+    """Crawl + fetch + catalogue a guideline source (see SOURCES). Idempotent
+    (skips slugs already held for that source unless refresh). Returns a summary."""
+    cfg = SOURCES[source]
     s = requests.Session()
     s.headers.update(_UA)
-    guidelines = crawl_rch_index(s)
+    guidelines = crawl_index(s, cfg)
     if verbose:
-        print(f"  RCH index: {len(guidelines)} guidelines")
+        print(f"  {source} index: {len(guidelines)} guidelines")
     if limit:
         guidelines = guidelines[:limit]
 
     con = library.connect()
     existing = {row[0] for row in
-                con.execute("SELECT slug FROM papers WHERE source='guideline:rch'").fetchall()}
+                con.execute("SELECT slug FROM papers WHERE source=?", (cfg["source"],)).fetchall()}
     con.close()
+
+    def _slug(name: str) -> str:
+        return cfg["slug_prefix"] + re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
     added = skipped = failed = thin = 0
     new_slugs: list[str] = []
     for i, (name, title, url) in enumerate(guidelines, 1):
-        slug = rch_slug(name)
+        slug = _slug(name)
         if slug in existing and not refresh:
             skipped += 1
             continue
@@ -128,8 +163,8 @@ def harvest_rch(*, limit: int = 0, pace_s: float = 0.7, refresh: bool = False,
             if len(text) < min_chars:
                 thin += 1
                 continue
-            _store_text(slug, title, text, source="guideline:rch",
-                        journal="RCH Clinical Practice Guidelines", url=url)
+            _store_text(slug, title, text, source=cfg["source"],
+                        journal=cfg["journal"], url=url)
             added += 1
             new_slugs.append(slug)
             if verbose:
@@ -144,6 +179,11 @@ def harvest_rch(*, limit: int = 0, pace_s: float = 0.7, refresh: bool = False,
         print(f"  harvest: +{added} added, {skipped} already held, "
               f"{failed} failed, {thin} too-thin")
     return summary
+
+
+def harvest_rch(**kw) -> dict:
+    """Back-compat alias — RCH via the generic harvester."""
+    return harvest("rch", **kw)
 
 
 def index_guidelines(source: str = "guideline:rch", verbose: bool = True) -> int:

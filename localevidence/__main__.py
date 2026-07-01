@@ -46,7 +46,8 @@ def main(argv=None) -> int:
     srv.add_argument("--host", default="127.0.0.1", help="Bind address (default localhost; use 0.0.0.0 only behind a private network)")
 
     gl = sub.add_parser("guidelines", help="Harvest web-published clinical guidelines into the local library")
-    gl.add_argument("--source", default="rch", choices=["rch"], help="Guideline source to harvest")
+    gl.add_argument("--source", default="rch", choices=["rch", "aih"],
+                    help="Guideline source to harvest (see guidelines.SOURCES)")
     gl.add_argument("--limit", type=int, default=0, help="Harvest at most N guidelines")
     gl.add_argument("--pace", type=float, default=0.7, help="Seconds between fetches")
     gl.add_argument("--refresh", action="store_true", help="Re-fetch guidelines already held")
@@ -168,12 +169,11 @@ def main(argv=None) -> int:
         return 0
 
     if args.command == "guidelines":
-        from .guidelines import harvest_rch, index_guidelines
-        if args.source == "rch":
-            harvest_rch(limit=args.limit, pace_s=args.pace, refresh=args.refresh,
-                        verbose=not args.quiet)
+        from .guidelines import harvest, index_guidelines, SOURCES
+        harvest(args.source, limit=args.limit, pace_s=args.pace, refresh=args.refresh,
+                verbose=not args.quiet)
         if not args.no_index:
-            index_guidelines(verbose=not args.quiet)
+            index_guidelines(SOURCES[args.source]["source"], verbose=not args.quiet)
         return 0
 
     if args.command == "load":
