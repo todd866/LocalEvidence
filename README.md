@@ -28,6 +28,18 @@ better the more *you* use it.
 > medical device, not autonomous clinical decision-making. Every claim is grounded
 > to a retrievable passage; provenance and reasoning are recorded, not hidden.
 
+## Three tools, three jobs
+
+LocalEvidence is one of three linked but distinct tools:
+
+| Tool | Does | Input → Output |
+|---|---|---|
+| [PaperScope](https://github.com/todd866/PaperScope) | **Analyzes** the literature — bibliography / DOI / retraction QA, forensic metascience, systematic reviews, embeddings. | papers → checked analysis |
+| **LocalEvidence** (this repo) | **Answers** a clinical question from a library you own, grounded and cited. | a question + your library → a cited evidence pack |
+| [EvidenceViewer](https://github.com/todd866/EvidenceViewer) | **Presents** any source-backed artifact through one contract + viewer, every claim traceable to its source. | an EvidenceArtifact → a source-linked reading UI |
+
+The pipeline: **PaperScope analyzes → LocalEvidence answers** (using PaperScope's fact-checking) **→ EvidenceViewer presents** either one's output.
+
 ## How it works
 
 ```
