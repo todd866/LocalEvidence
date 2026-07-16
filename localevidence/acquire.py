@@ -52,10 +52,12 @@ def _pull_bounded(fn: Callable[[], object], *, timeout_s: float):
     force-killed from here) and the run moves on; the orphaned thread dies with
     the process. This is the CLI hang-guard, not a hard cancellation — a pull
     that completes just after the deadline may still finish its own commit into
-    the local library out of band (harmless: it is idempotent and slug-keyed, so
-    the paper is simply found as `already_have` next run). For a truly killable
-    pull, run each acquisition in its own process; that is deliberately out of
-    scope for this self-contained public build.
+    the local library out of band. That commit is safe: the library store
+    serializes writes (`catalog._write_lock`) so a late orphan cannot interleave
+    a torn file with a concurrent same-slug pull, and the paper is simply found
+    as `already_have` next run. For a truly killable pull, run each acquisition
+    in its own process; that is deliberately out of scope for this self-contained
+    public build.
     """
     if timeout_s is None or timeout_s <= 0:
         return fn()

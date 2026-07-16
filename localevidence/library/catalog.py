@@ -13,10 +13,18 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .. import config
+
+# Serializes store writes within a process. acquire()'s per-pull timeout can
+# leave an orphan worker still writing a slug's files while a later same-slug
+# pull writes them too (single-process multi-question runs); this keeps those
+# non-atomic file writes from interleaving into a torn PDF/text. The catalog DB
+# is separately guarded by PRAGMA busy_timeout.
+_write_lock = threading.Lock()
 
 LIBRARY_ROOT = config.LIBRARY_ROOT
 PDFS = LIBRARY_ROOT / "pdfs"
@@ -110,16 +118,17 @@ def store_pdf(pdf_bytes: bytes, *, doi="", pmid="", md5="", title="", authors=""
     from .extract import extract_text
     slug = slugify(doi=doi, pmid=pmid, md5=md5)
     pdf_path = PDFS / f"{slug}.pdf"
-    pdf_path.write_bytes(pdf_bytes)
     text_path = TEXTS / f"{slug}.txt"
-    has_text = extract_text(pdf_path, text_path)
-    return upsert(dict(
-        slug=slug, doi=norm_doi(doi), md5=md5, pmid=str(pmid or ""),
-        cite_key=cite_key, title=title, authors=authors, year=str(year or ""),
-        journal=journal, pdf_path=str(pdf_path),
-        text_path=str(text_path) if has_text else "",
-        bytes=len(pdf_bytes), source=source,
-        added_ts=datetime.now(timezone.utc).isoformat(timespec="seconds")))
+    with _write_lock:
+        pdf_path.write_bytes(pdf_bytes)
+        has_text = extract_text(pdf_path, text_path)
+        return upsert(dict(
+            slug=slug, doi=norm_doi(doi), md5=md5, pmid=str(pmid or ""),
+            cite_key=cite_key, title=title, authors=authors, year=str(year or ""),
+            journal=journal, pdf_path=str(pdf_path),
+            text_path=str(text_path) if has_text else "",
+            bytes=len(pdf_bytes), source=source,
+            added_ts=datetime.now(timezone.utc).isoformat(timespec="seconds")))
 
 
 def store_text(slug: str, title: str, text: str, *, source: str,
@@ -130,12 +139,13 @@ def store_text(slug: str, title: str, text: str, *, source: str,
     want the passage index to retrieve over.
     """
     text_path = TEXTS / f"{slug}.txt"
-    text_path.write_text(text)
-    return upsert(dict(
-        slug=slug, doi="", md5="", pmid="", cite_key="", title=title, authors="",
-        year=year or str(datetime.now().year), journal=journal, pdf_path=url,
-        text_path=str(text_path), bytes=len(text.encode("utf-8")), source=source,
-        added_ts=datetime.now(timezone.utc).isoformat(timespec="seconds")))
+    with _write_lock:
+        text_path.write_text(text)
+        return upsert(dict(
+            slug=slug, doi="", md5="", pmid="", cite_key="", title=title, authors="",
+            year=year or str(datetime.now().year), journal=journal, pdf_path=url,
+            text_path=str(text_path), bytes=len(text.encode("utf-8")), source=source,
+            added_ts=datetime.now(timezone.utc).isoformat(timespec="seconds")))
 
 
 def import_pdf(path: str | Path, **meta) -> dict:

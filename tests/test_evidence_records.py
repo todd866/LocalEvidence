@@ -48,13 +48,40 @@ class EvidenceRecordsTest(unittest.TestCase):
     def test_long_snippet_is_whitespace_normalized_and_truncated(self):
         from localevidence.index import Passage
         from localevidence import pipeline
-        long_text = "word " * 400  # ~2000 chars, with runs of whitespace
+        # Real whitespace runs (double spaces, tab, newline) so the assertions
+        # below actually exercise the ' '.join(text.split()) normalization.
+        long_text = "alpha  beta\t gamma\n   delta " * 100  # >600 chars, with runs
         rec = pipeline.evidence_from_passages(
             [Passage(passage_id=9, slug="p", text=long_text, score=1.0)]
         )[0]
         self.assertLessEqual(len(rec["snippet"]), 602)
-        self.assertNotIn("  ", rec["snippet"])  # collapsed whitespace
+        self.assertNotIn("  ", rec["snippet"])   # double spaces collapsed
+        self.assertNotIn("\t", rec["snippet"])   # tabs collapsed
+        self.assertNotIn("\n", rec["snippet"])   # newlines collapsed
         self.assertTrue(rec["snippet"].endswith("…"))
+
+    def test_tie_on_score_keeps_the_first_seen_passage(self):
+        from localevidence.index import Passage
+        from localevidence import pipeline
+        recs = pipeline.evidence_from_passages([
+            Passage(passage_id=1, slug="p", text="first", score=0.5),
+            Passage(passage_id=2, slug="p", text="second", score=0.5),
+        ])
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0]["snippet"], "first")  # strict '>' keeps first-seen
+
+    def test_empty_passages_returns_empty_list(self):
+        from localevidence import pipeline
+        self.assertEqual(pipeline.evidence_from_passages([]), [])
+
+    def test_single_zero_score_passage_still_gets_a_snippet(self):
+        from localevidence.index import Passage
+        from localevidence import pipeline
+        rec = pipeline.evidence_from_passages(
+            [Passage(passage_id=1, slug="p", text="only chunk", score=0.0)]
+        )[0]
+        self.assertEqual(rec["snippet"], "only chunk")
+        self.assertEqual(rec["score"], 0.0)
 
 
 if __name__ == "__main__":
