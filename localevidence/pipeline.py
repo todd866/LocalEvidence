@@ -38,6 +38,38 @@ def _read_json(path: Path):
     return json.loads(path.read_text())
 
 
+def _snippet(text: str, maxlen: int = 600) -> str:
+    """Whitespace-normalised passage excerpt (matches evidence.py's pack style)."""
+    s = " ".join((text or "").split())
+    if len(s) > maxlen:
+        s = s[:maxlen].rsplit(" ", 1)[0] + " …"
+    return s
+
+
+def evidence_from_passages(passages) -> list[dict]:
+    """Collapse retrieved passages into one evidence record per source paper.
+
+    Each record is `{slug, doi, title, tier, passage_ids, snippet, score}`.
+    `snippet` (text of the highest-scoring passage for that slug) and `score`
+    (the max passage score) are what the EvidenceViewer localevidence loader
+    reads to render a source-linked passage; without them the viewer shows
+    empty passages. Passage order is not assumed — the best passage wins.
+    """
+    ev_by_slug: dict[str, dict] = {}
+    best_score: dict[str, float] = {}
+    for p in passages:
+        e = ev_by_slug.setdefault(p.slug, {"slug": p.slug, "doi": p.doi,
+                                           "title": p.title, "tier": p.tier,
+                                           "passage_ids": [], "snippet": "",
+                                           "score": 0.0})
+        e["passage_ids"].append(p.passage_id)
+        if p.slug not in best_score or p.score > best_score[p.slug]:
+            best_score[p.slug] = p.score
+            e["score"] = p.score
+            e["snippet"] = _snippet(p.text)
+    return list(ev_by_slug.values())
+
+
 def _ensure_project(question: str, project: Optional[str]) -> Path:
     slug = project or _slug(question)
     pdir = config.PROJECTS / slug
@@ -188,7 +220,7 @@ def ask(
         _write_json(acquire_path, {
             **{k: getattr(report, k) for k in
                ("pulled", "already_have", "from_library", "no_oa",
-                "not_found", "wrong_paper_only", "no_text")},
+                "not_found", "wrong_paper_only", "no_text", "budget_skipped")},
             "failures": report.failures,
             "papers": [p.to_dict() for p in report.papers],
             "_summary": report.summary(),
@@ -231,14 +263,8 @@ def ask(
 
     # 7. Knowledge ledger — record the question + the evidence it used. The
     # answer + reasoning are filled later at synthesis (led.update).
-    ev_by_slug: dict[str, dict] = {}
-    for p in passages:
-        e = ev_by_slug.setdefault(p.slug, {"slug": p.slug, "doi": p.doi,
-                                           "title": p.title, "tier": p.tier,
-                                           "passage_ids": []})
-        e["passage_ids"].append(p.passage_id)
     entry_id = led.record(question, project=project_dir.name, run_id=run_id,
-                          evidence=list(ev_by_slug.values()),
+                          evidence=evidence_from_passages(passages),
                           coverage=pack.coverage, gaps=pack.gaps)
 
     summary = {

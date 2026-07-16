@@ -50,6 +50,7 @@ def _coverage(triage_result: TriageResult, acq: AcquireReport,
         "already_in_library": acq.from_library + acq.already_have,
         "newly_pulled": acq.pulled,
         "could_not_acquire": acq.no_oa + acq.not_found + acq.wrong_paper_only,
+        "budget_skipped": acq.budget_skipped,
         "papers_indexed": len(acq.papers),
         "passages_indexed": n_passages,
     }

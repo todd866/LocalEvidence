@@ -69,7 +69,10 @@ class Ledger:
                gaps: Optional[list] = None, supersedes: Optional[int] = None) -> int:
         """Append the question + evidence half of an entry; returns its id.
 
-        `evidence` is a list of {slug, doi, title, tier, passage_ids}.
+        `evidence` is a list of
+        {slug, doi, title, tier, passage_ids, snippet, score} (see
+        `pipeline.evidence_from_passages`); `snippet`/`score` are what the
+        EvidenceViewer loader renders per passage.
         Answer/reasoning/grounding are filled later via `update`.
         """
         entry_id = self._next_id()
