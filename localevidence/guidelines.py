@@ -7,9 +7,10 @@ index, fetches each guideline, extracts the body text, and catalogues it into th
 local library with a synthetic slug (source 'guideline:rch') so the persistent
 passage index picks it up and every future question can ground in them.
 
-The shipped source is RCH (a worked example of the pattern); adding ASCIA, NICE,
-state pathways, etc. is a matter of writing another crawler that ends in
-`library.store_text`.
+Shipped sources: RCH (Melbourne CPGs), AIH (the Australian Immunisation
+Handbook), ASCIA (allergy/immunology), and RANZCOG (obstetrics/gynaecology).
+Adding more — NICE, state pathways, etc. — is a matter of writing another
+crawler that ends in `library.store_text`.
 
 Idempotent (skips guidelines already held unless --refresh) and politely paced.
 Copyright stays the publisher's: harvested text lands in your personal corpus,

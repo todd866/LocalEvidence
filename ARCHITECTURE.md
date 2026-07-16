@@ -140,11 +140,12 @@ replace it with your own.
 
 ### 7. Guidelines — ✅
 
-`localevidence guidelines` harvests web-published clinical guidelines (RCH
-Melbourne CPGs shipped as the worked example) into the library as text docs, so
-the convention-setters a clinician actually follows are retrievable even though
-they have no DOI. Adding ASCIA / NICE / state pathways is another small crawler
-ending in `library.store_text`.
+`localevidence guidelines` harvests web-published clinical guidelines into the
+library as text docs, so the convention-setters a clinician actually follows are
+retrievable even though they have no DOI. Four sources ship: RCH (Melbourne
+CPGs), AIH (the Australian Immunisation Handbook), ASCIA (allergy/immunology),
+and RANZCOG (obstetrics/gynaecology). Adding more — NICE, state pathways — is
+another small crawler ending in `library.store_text`.
 
 ### 8. Serve — ✅
 
@@ -257,7 +258,7 @@ acquisition method — ever enters git history.
 3. ✅ persistent passage index (hybrid dense + BM25, tier/guideline guarantees).
 4. ✅ knowledge ledger (store Q + A + reasoning; reuse lookup; writeback).
 5. ✅ simulated-question loader + seed bank.
-6. ✅ guideline harvester (RCH worked example).
+6. ✅ guideline harvester (RCH, AIH, ASCIA, RANZCOG).
 7. ✅ serve + offline PWA.
 8. ✅ audit layer (provenance trail + citation-provenance check + verification ceiling).
 8b. ✅ knowledge packs (`pack export`/`harvest`): the shareable list + summaries + map of a corpus, minus the copyrighted PDFs — corpus distributable as a public good (see `docs/PACK.md`).

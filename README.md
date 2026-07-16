@@ -36,7 +36,7 @@ LocalEvidence is one of three linked but distinct tools:
 |---|---|---|
 | [PaperScope](https://github.com/todd866/PaperScope) | **Analyzes** the literature — bibliography / DOI / retraction QA, forensic metascience, systematic reviews, embeddings. | papers → checked analysis |
 | **LocalEvidence** (this repo) | **Answers** a clinical question from a library you own, grounded and cited. | a question + your library → a cited evidence pack |
-| [EvidenceViewer](https://github.com/todd866/EvidenceViewer) | **Presents** any source-backed artifact through one contract + viewer, every claim traceable to its source. | an EvidenceArtifact → a source-linked reading UI |
+| [EvidenceViewer](https://github.com/todd866/EvidenceViewer-public) | **Presents** any source-backed artifact through one contract + viewer, every claim traceable to its source. | an EvidenceArtifact → a source-linked reading UI |
 
 The pipeline: **PaperScope analyzes → LocalEvidence answers** (using PaperScope's fact-checking) **→ EvidenceViewer presents** either one's output.
 
@@ -161,8 +161,10 @@ a free local model; `--harness` for the multi-stage loop), `eval-local` (run the
 harness over many questions on-device and score grounding/reasoning — see
 [`evals/`](evals/)), `index-library` (index a corpus you already hold), `pack`
 (export/harvest a shareable knowledge pack), `queue` (drain the phone queue),
-`load` (self-play a question bank), `guidelines` (harvest CPGs), `serve` (backend +
-PWA). `--help` on each.
+`load` (self-play a question bank), `guidelines` (harvest CPGs), `operating-point`
+(show the deterministic local decision for a probability — the settable dial a
+closed tool won't expose; see [`examples/operating_points/`](examples/operating_points/)),
+`serve` (backend + PWA). `--help` on each.
 
 ### Bulk-index a library you've built up
 
